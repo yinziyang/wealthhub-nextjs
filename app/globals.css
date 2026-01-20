@@ -1,26 +1,71 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-background: #0e1012;
+  --color-foreground: #ededed;
+  --color-primary: #a77d2f;
+  --color-primary-dim: #8c6826;
+  --color-surface-darker: #121417;
+  --color-surface-dark: #1a1c1f;
+  --color-background-light: #fbfaf9;
+  --color-background-dark: #0e1012;
+  --color-border-gold-faint: rgba(167, 125, 47, 0.12);
+  --font-family-base: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --box-shadow-gold-glow: 0 10px 40px -10px rgba(167, 125, 47, 0.15);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+@variant dark (&:where(.dark, .dark *));
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-family-base);
+  min-height: 100dvh;
+  scroll-behavior: smooth;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ===== iOS Safari Input Zoom Prevention ===== */
+/* 
+ * iOS Safari auto-zooms when focusing inputs with font-size < 16px.
+ * This also affects the visual viewport in fixed-position modals.
+ */
+@supports (-webkit-touch-callout: none) {
+  /* 1. Ensure all form elements have font-size >= 16px */
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+  
+  /* 2. Prevent text size adjustment */
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  
+  /* 3. Disable touch manipulation (prevent double-tap zoom) */
+  html, body {
+    touch-action: manipulation;
+  }
+  
+  /* 4. Fix for iOS visual viewport issues with fixed elements */
+  body.modal-open {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
 }

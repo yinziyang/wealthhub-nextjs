@@ -1,65 +1,79 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect } from 'react';
+import Header from '@/components/Header';
+import AssetOverview from '@/components/AssetOverview';
+import AssetList from '@/components/AssetList';
+import BottomNav from '@/components/BottomNav';
+import AddAssetModal from '@/components/AddAssetModal';
+import { Asset } from '@/types';
+import { createAssetObject } from '@/utils';
 
 export default function Home() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('private_client_assets');
+    const today = new Date().toISOString().split('T')[0];
+    
+    const defaultAssets: Asset[] = [
+       createAssetObject('rmb', '人民币存款', 5000000, true, {}, today, 'default-rmb'),
+       createAssetObject('usd', '美元资产', 3550000, true, { usdAmount: 500000, exchangeRate: 7.1 }, today, 'default-usd'),
+       createAssetObject('gold', '实物黄金', 2400000, true, { weight: 5000, goldPrice: 480 }, today, 'default-gold'),
+       createAssetObject('debt', '债权资产', 1500000, true, {}, today, 'default-debt'),
+    ];
+    defaultAssets[0].subtitle = '4个账户正在监测';
+    defaultAssets[3].subtitle = '3笔进行中借款';
+    
+    const loadedAssets = saved ? JSON.parse(saved) : defaultAssets;
+    
+    const idMap = new Map<string, number>();
+    const uniqueAssets = loadedAssets.map((asset: Asset) => {
+      const count = idMap.get(asset.id) || 0;
+      idMap.set(asset.id, count + 1);
+      
+      if (count > 0) {
+        return { ...asset, id: `${asset.id}-dup-${count}` };
+      }
+      return asset;
+    });
+    
+    setAssets(uniqueAssets);
+    setIsLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (isLoaded) {
+      localStorage.setItem('private_client_assets', JSON.stringify(assets));
+    }
+  }, [assets, isLoaded]);
+
+  const handleAddAsset = (newAsset: Asset) => {
+    setAssets(prev => [newAsset, ...prev]);
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="bg-background-light dark:bg-background-dark font-display antialiased text-slate-900 dark:text-slate-50 transition-colors duration-200 min-h-screen flex justify-center">
+      <div className="relative flex h-full min-h-screen w-full flex-col overflow-x-hidden max-w-md bg-background-light dark:bg-background-dark shadow-2xl border-x border-slate-200 dark:border-slate-800">
+        
+        <Header />
+        
+        <main className="flex-1 px-5 pt-[100px] pb-28">
+          <AssetOverview assets={assets} />
+          <AssetList assets={assets} />
+        </main>
+
+        <BottomNav onAddClick={() => setIsModalOpen(true)} />
+
+        <AddAssetModal 
+          isOpen={isModalOpen} 
+          onClose={() => setIsModalOpen(false)} 
+          onSave={handleAddAsset}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+        
+      </div>
     </div>
   );
 }
