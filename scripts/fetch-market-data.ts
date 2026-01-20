@@ -10,8 +10,13 @@ import {
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
-function toBeijingISO(dateStr: string): string {
-  return dateStr.replace(' ', 'T') + '+08:00';
+function beijingStringToUTC(beijingStr: string): string {
+  const [datePart, timePart] = beijingStr.split(' ');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour, minute, second] = timePart.split(':').map(Number);
+
+  const utcDate = new Date(Date.UTC(year, month - 1, day, hour - 8, minute, second));
+  return utcDate.toISOString();
 }
 
 function generateHourKey(date: Date): string {
@@ -21,7 +26,7 @@ function generateHourKey(date: Date): string {
   const utcHour = date.getUTCHours();
 
   const beijingHour = (utcHour + 8) % 24;
-  let dayOffset = Math.floor((utcHour + 8) / 24);
+  const dayOffset = Math.floor((utcHour + 8) / 24);
 
   const beijingDate = new Date(Date.UTC(utcYear, utcMonth, utcDay + dayOffset));
   const year = beijingDate.getUTCFullYear();
@@ -38,7 +43,7 @@ function generateDateKey(date: Date): string {
   const utcDay = date.getUTCDate();
   const utcHour = date.getUTCHours();
 
-  let dayOffset = Math.floor((utcHour + 8) / 24);
+  const dayOffset = Math.floor((utcHour + 8) / 24);
 
   const beijingDate = new Date(Date.UTC(utcYear, utcMonth, utcDay + dayOffset));
   const year = beijingDate.getUTCFullYear();
@@ -77,22 +82,22 @@ async function main() {
 
     console.log('\n正在写入数据库...');
 
-    const goldUpdatedAtISO = toBeijingISO(goldData.updateTime);
-    const exchangeUpdatedAtISO = toBeijingISO(exchangeData.updateTime);
+    const goldUpdatedAtUTC = beijingStringToUTC(goldData.updateTime);
+    const exchangeUpdatedAtUTC = beijingStringToUTC(exchangeData.updateTime);
 
     const [
       exchangeResult,
       goldResult,
       dailyResult,
     ] = await Promise.all([
-      saveExchangeRate(exchangeData.rate, exchangeUpdatedAtISO, hourKey),
-      saveGoldPrice(goldData.price, goldUpdatedAtISO, hourKey),
+      saveExchangeRate(exchangeData.rate, exchangeUpdatedAtUTC, hourKey),
+      saveGoldPrice(goldData.price, goldUpdatedAtUTC, hourKey),
       saveDailyMarketData({
         date: dateKey,
         goldPrice: goldData.price,
-        goldUpdatedAt: goldUpdatedAtISO,
+        goldUpdatedAt: goldUpdatedAtUTC,
         exchangeRate: exchangeData.rate,
-        exchangeUpdatedAt: exchangeUpdatedAtISO,
+        exchangeUpdatedAt: exchangeUpdatedAtUTC,
       }),
     ]);
 
