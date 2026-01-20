@@ -15,17 +15,36 @@ function toBeijingISO(dateStr: string): string {
 }
 
 function generateHourKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hour = String(date.getHours()).padStart(2, '0');
+  const utcYear = date.getUTCFullYear();
+  const utcMonth = date.getUTCMonth();
+  const utcDay = date.getUTCDate();
+  const utcHour = date.getUTCHours();
+
+  const beijingHour = (utcHour + 8) % 24;
+  let dayOffset = Math.floor((utcHour + 8) / 24);
+
+  const beijingDate = new Date(Date.UTC(utcYear, utcMonth, utcDay + dayOffset));
+  const year = beijingDate.getUTCFullYear();
+  const month = String(beijingDate.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(beijingDate.getUTCDate()).padStart(2, '0');
+  const hour = String(beijingHour).padStart(2, '0');
+
   return `${year}${month}${day}${hour}`;
 }
 
 function generateDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const utcYear = date.getUTCFullYear();
+  const utcMonth = date.getUTCMonth();
+  const utcDay = date.getUTCDate();
+  const utcHour = date.getUTCHours();
+
+  let dayOffset = Math.floor((utcHour + 8) / 24);
+
+  const beijingDate = new Date(Date.UTC(utcYear, utcMonth, utcDay + dayOffset));
+  const year = beijingDate.getUTCFullYear();
+  const month = String(beijingDate.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(beijingDate.getUTCDate()).padStart(2, '0');
+
   return `${year}-${month}-${day}`;
 }
 
