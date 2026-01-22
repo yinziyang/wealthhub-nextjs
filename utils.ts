@@ -113,3 +113,71 @@ export function createAssetObject(
     date
   };
 }
+
+export function getLatestValue(history: Record<string, number>): number {
+  const entries = Object.entries(history);
+  if (entries.length === 0) return 0;
+  
+  const sorted = entries.sort(([a], [b]) => {
+    const dateA = parseInt(a);
+    const dateB = parseInt(b);
+    return dateB - dateA;
+  });
+  
+  return sorted[0][1] || 0;
+}
+
+export function generateChartPath(history: Record<string, number>): string {
+  const entries = Object.entries(history);
+  if (entries.length < 2) {
+    return CHART_PATHS[Math.floor(Math.random() * CHART_PATHS.length)];
+  }
+  
+  const sorted = entries.sort(([a], [b]) => {
+    const dateA = parseInt(a);
+    const dateB = parseInt(b);
+    return dateA - dateB;
+  });
+  
+  const values = sorted.map(([, value]) => value).filter(v => v > 0);
+  
+  if (values.length === 0) {
+    return CHART_PATHS[Math.floor(Math.random() * CHART_PATHS.length)];
+  }
+  
+  const minVal = Math.min(...values);
+  const maxVal = Math.max(...values);
+  
+  const heightRange = 80;
+  const bottomPadding = 10;
+  
+  const getY = (value: number): number => {
+    if (minVal === maxVal) return 50;
+    const normalized = (value - minVal) / (maxVal - minVal);
+    return bottomPadding + heightRange - (normalized * heightRange);
+  };
+  
+  const points: [number, number][] = [];
+  
+  sorted.forEach(([, value], index) => {
+    const x = (index / (sorted.length - 1)) * 100;
+    const y = getY(value);
+    points.push([x, y]);
+  });
+  
+  if (points.length === 1) {
+    const [x, y] = points[0];
+    return `M${x},${y} L${x},${y} L100 100 L0 100 Z`;
+  }
+  
+  let path = `M${points[0][0]},${points[0][1]}`;
+  
+  for (let i = 1; i < points.length; i++) {
+    const [x, y] = points[i];
+    path += ` L${x},${y}`;
+  }
+  
+  path += ` L100 100 L0 100 Z`;
+  
+  return path;
+}

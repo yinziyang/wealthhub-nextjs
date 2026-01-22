@@ -26,5 +26,17 @@ export interface DistributionItem {
   label: string;
   percentage: number;
   color: string;
+  bgColor?: string;
   offset: number;
 }
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  full_name?: string;
+  avatar_url?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CurrentTab = 'assets' | 'profile';

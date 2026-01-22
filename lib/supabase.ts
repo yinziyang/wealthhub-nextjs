@@ -58,7 +58,7 @@ export async function saveExchangeRate(
         rate,
         updated_at: updatedAt,
         hour_key: hourKey,
-      },
+      } as any,
       { onConflict: 'hour_key' }
     )
     .select()
@@ -87,7 +87,7 @@ export async function saveGoldPrice(
         price,
         updated_at: updatedAt,
         hour_key: hourKey,
-      },
+      } as any,
       { onConflict: 'hour_key' }
     )
     .select()
@@ -127,7 +127,7 @@ export async function saveDailyMarketData({
         exchange_rate: exchangeRate,
         exchange_updated_at: exchangeUpdatedAt,
         updated_at: new Date().toISOString(),
-      },
+      } as any,
       { onConflict: 'date' }
     )
     .select()

@@ -1,21 +1,35 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import Header from '@/components/Header';
 import AssetOverview from '@/components/AssetOverview';
 import AssetList from '@/components/AssetList';
 import BottomNav from '@/components/BottomNav';
 import AddAssetModal from '@/components/AddAssetModal';
+import ProfilePage from '@/components/ProfilePage';
+import AuthGuard from '@/components/AuthGuard';
 import { Asset } from '@/types';
 import { createAssetObject } from '@/utils';
+import type { MarketDataHistoryResponse } from '@/lib/api-response';
 
-export default function Home() {
+type CurrentTab = 'assets' | 'profile';
+
+function Dashboard() {
+  const { user } = useAuth();
+  const [currentTab, setCurrentTab] = useState<CurrentTab>('assets');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [marketData, setMarketData] = useState<MarketDataHistoryResponse | null>(null);
+  const [isMarketDataLoading, setIsMarketDataLoading] = useState(false);
+
+  const STORAGE_KEY = user?.email 
+    ? `private_client_assets_${user.email}` 
+    : 'private_client_assets';
 
   useEffect(() => {
-    const saved = localStorage.getItem('private_client_assets');
+    const saved = localStorage.getItem(STORAGE_KEY);
     const today = new Date().toISOString().split('T')[0];
     
     const defaultAssets: Asset[] = [
@@ -42,30 +56,97 @@ export default function Home() {
     
     setAssets(uniqueAssets);
     setIsLoaded(true);
-  }, []);
+  }, [STORAGE_KEY]);
 
   useEffect(() => {
     if (isLoaded) {
-      localStorage.setItem('private_client_assets', JSON.stringify(assets));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(assets));
     }
-  }, [assets, isLoaded]);
+  }, [assets, isLoaded, STORAGE_KEY]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let timeoutId: NodeJS.Timeout;
+
+    const fetchMarketData = async () => {
+      if (currentTab !== 'assets') return;
+
+      setIsMarketDataLoading(true);
+      try {
+        const response = await fetch('/api/market-data/history?days=7', {
+          signal: controller.signal
+        });
+        const result = await response.json();
+        
+        if (!controller.signal.aborted) {
+          if (result.success) {
+            setMarketData(result.data);
+          } else {
+            setMarketData({
+              gold_price: {},
+              exchange_rate: {}
+            });
+          }
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') return;
+        
+        setMarketData({
+          gold_price: {},
+          exchange_rate: {}
+        });
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsMarketDataLoading(false);
+        }
+      }
+    };
+
+    // Debounce the fetch to avoid double-calling in Strict Mode
+    timeoutId = setTimeout(() => {
+      fetchMarketData();
+    }, 50);
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [currentTab]);
 
   const handleAddAsset = (newAsset: Asset) => {
     setAssets(prev => [newAsset, ...prev]);
   };
 
+  const handleTabChange = (tab: CurrentTab) => {
+    setCurrentTab(tab);
+    // 由于“资产/我的”在同一页面内切换，滚动位置会被复用；这里强制回到顶部
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    });
+  };
+
   return (
     <div className="bg-background-light dark:bg-background-dark font-display antialiased text-slate-900 dark:text-slate-50 transition-colors duration-200 min-h-screen flex justify-center">
-      <div className="relative flex h-full min-h-screen w-full flex-col overflow-x-hidden max-w-md bg-background-light dark:bg-background-dark shadow-2xl border-x border-slate-200 dark:border-slate-800">
+      <div className="relative flex h-full min-h-screen w-full flex-col overflow-x-hidden max-w-md bg-background-light dark:bg-background-dark shadow-2xl">
         
-        <Header />
+        <Header currentTab={currentTab} />
         
-        <main className="flex-1 px-5 pt-[100px] pb-28">
-          <AssetOverview assets={assets} />
-          <AssetList assets={assets} />
+        <main className="flex-1 px-5 pt-[100px] pb-28 outline-none">
+          {currentTab === 'assets' ? (
+            <>
+              <AssetOverview assets={assets} />
+              <AssetList assets={assets} marketData={marketData} isLoading={isMarketDataLoading} />
+            </>
+          ) : (
+            <ProfilePage />
+          )}
         </main>
 
-        <BottomNav onAddClick={() => setIsModalOpen(true)} />
+        <BottomNav 
+          onAddClick={() => setIsModalOpen(true)}
+          currentTab={currentTab}
+          onTabChange={handleTabChange}
+        />
 
         <AddAssetModal 
           isOpen={isModalOpen} 
@@ -75,5 +156,13 @@ export default function Home() {
         
       </div>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <AuthGuard>
+      <Dashboard />
+    </AuthGuard>
   );
 }

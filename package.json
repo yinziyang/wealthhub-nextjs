@@ -10,6 +10,7 @@
     "fetch-data": "tsx scripts/fetch-market-data.ts"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.90.1",
     "antd-mobile": "^5.42.3",
     "dotenv": "^17.2.3",

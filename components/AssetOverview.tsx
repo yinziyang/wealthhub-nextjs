@@ -18,11 +18,11 @@ const AssetOverview: React.FC<AssetOverviewProps> = ({ assets }) => {
       return acc;
     }, {} as Record<string, number>);
 
-    const typeConfig: Record<string, { label: string, color: string }> = {
-      rmb: { label: '人民币', color: 'text-primary' },
-      usd: { label: '美元资产', color: 'text-[#4a6fa5]' },
-      gold: { label: '实物黄金', color: 'text-[#c5a059]' },
-      debt: { label: '债权资产', color: 'text-[#58508d]' }
+    const typeConfig: Record<string, { label: string, color: string, bgColor: string }> = {
+      rmb: { label: '人民币', color: 'text-primary', bgColor: 'bg-primary' },
+      usd: { label: '美元资产', color: 'text-[#4a6fa5]', bgColor: 'bg-[#4a6fa5]' },
+      gold: { label: '实物黄金', color: 'text-[#c5a059]', bgColor: 'bg-[#c5a059]' },
+      debt: { label: '债权资产', color: 'text-[#58508d]', bgColor: 'bg-[#58508d]' }
     };
 
     let accumulatedPercentage = 0;
@@ -39,6 +39,7 @@ const AssetOverview: React.FC<AssetOverviewProps> = ({ assets }) => {
             label: typeConfig[type]?.label || type,
             percentage: percentage,
             color: typeConfig[type]?.color || 'text-slate-500',
+            bgColor: typeConfig[type]?.bgColor || 'bg-slate-500',
             offset: -accumulatedPercentage
         });
 
@@ -53,7 +54,7 @@ const AssetOverview: React.FC<AssetOverviewProps> = ({ assets }) => {
 
   return (
     <section 
-      className="relative bg-surface-darker border border-[rgba(167,125,47,0.12)] pt-8 pb-8 px-6 mb-8 shadow-[0_10px_40px_-10px_rgba(167,125,47,0.15)]"
+      className="relative -mt-2 bg-surface-darker border border-[rgba(167,125,47,0.12)] pt-8 pb-8 px-6 mb-8 shadow-[0_10px_40px_-10px_rgba(167,125,47,0.15)]"
       style={{
         borderRadius: '32px',
         overflow: 'hidden',
@@ -128,7 +129,7 @@ const AssetOverview: React.FC<AssetOverviewProps> = ({ assets }) => {
           {distribution.map((item) => (
              <div key={item.id} className="flex items-center justify-between group cursor-pointer">
               <div className="flex items-center gap-2">
-                <div className={`size-2 rounded-full ${item.color.replace('text-', 'bg-')}`}></div>
+                <div className={`size-2 rounded-full ${item.bgColor || item.color.replace('text-', 'bg-')}`}></div>
                 <span className="text-xs font-medium text-slate-300 group-hover:text-white transition-colors">
                   {item.label}
                 </span>
