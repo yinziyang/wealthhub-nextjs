@@ -128,10 +128,16 @@ const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
 
   return (
     <div className="space-y-3">
-      <div className="text-slate-900 dark:text-white text-base font-bold">
-        购买记录
+      <div className="flex items-center justify-between px-1">
+        <div className="text-slate-900 dark:text-white text-base font-bold">
+          购买记录
+        </div>
+        <div className="text-xs text-slate-500 font-normal">
+          {sortedRecords.length}笔交易
+        </div>
       </div>
-      <div className="space-y-3">
+
+      <div className="grid gap-2.5 max-h-[400px] overflow-y-auto pr-1">
         {sortedRecords.map((record) => {
           const goldPriceAmount = record.weight * record.goldPrice;
           const handlingFeeAmount = record.weight * record.handlingFee;
@@ -140,37 +146,49 @@ const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
           return (
             <div
               key={record.id}
-              className="rounded-2xl bg-surface-darker border border-[rgba(167,125,47,0.12)] overflow-hidden shadow-sm p-4"
+              className="rounded-xl bg-surface-darker border border-[rgba(167,125,47,0.12)] p-3 shadow-sm"
             >
-              {/* 顶部：日期和盈利/亏损 */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-slate-500 dark:text-slate-400 text-sm font-medium">
-                  {record.date}
+              {/* 第一行：主要信息 (克重、日期、总盈亏) */}
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-lg font-bold text-slate-900 dark:text-white">
+                    {formatNumber(record.weight, 0)}<span className="text-xs font-normal text-slate-500 ml-0.5">g</span>
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    {record.date}
+                  </span>
                 </div>
-                <div className={`text-base font-bold ${
-                  record.profitLoss >= 0 
-                    ? 'text-emerald-500 dark:text-emerald-400' 
-                    : 'text-red-500 dark:text-red-400'
-                }`}>
+                <div className={`text-sm font-bold ${record.profitLoss >= 0
+                  ? 'text-emerald-500'
+                  : 'text-red-500'
+                  }`}>
                   {record.profitLoss >= 0 ? '+' : ''}¥{formatNumber(record.profitLoss, 0)}
                 </div>
               </div>
 
-              {/* 中间：购买信息 */}
-              <div className="mb-3">
-                <div className="text-slate-900 dark:text-white text-sm">
-                  {formatNumber(record.weight, 0)}g 金价：{formatNumber(record.goldPrice, 1)}/g 手续费: {formatNumber(record.handlingFee, 0)}元/g
-                </div>
-              </div>
-
-              {/* 底部：成本明细 */}
-              <div className="pt-3 border-t border-white/5">
-                <div className="flex items-center justify-between text-sm">
-                  <div className="text-slate-500 dark:text-slate-400">
-                    ¥{formatNumber(goldPriceAmount, 0)} (金价) + ¥{formatNumber(handlingFeeAmount, 0)} (手续费) = 
+              {/* 第二行：详细数据 */}
+              <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100 dark:border-white/5">
+                {/* 左侧：单价信息 */}
+                <div className="flex flex-col gap-1 text-slate-500 dark:text-slate-400">
+                  <div className="flex items-center gap-1.5">
+                    <span className="opacity-70">金价</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-300">¥{formatNumber(record.goldPrice, 1)}</span>
                   </div>
-                  <div className="text-yellow-500 dark:text-yellow-400 font-bold ml-2">
-                    ¥{formatNumber(totalAmount, 0)}
+                  <div className="flex items-center gap-1.5">
+                    <span className="opacity-70">工费</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-300">¥{formatNumber(record.handlingFee, 0)}</span>
+                  </div>
+                </div>
+
+                {/* 右侧：总成本构成 */}
+                <div className="flex flex-col gap-1 items-end text-slate-500 dark:text-slate-400">
+                  <div className="flex items-center gap-1">
+                    <span className="font-medium text-slate-700 dark:text-slate-300">¥{formatNumber(goldPriceAmount, 0)}</span>
+                    <span className="opacity-70 text-[10px]">+ ¥{formatNumber(handlingFeeAmount, 0)}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="opacity-70">总成本</span>
+                    <span className="font-bold text-yellow-600 dark:text-yellow-500 text-sm">¥{formatNumber(totalAmount, 0)}</span>
                   </div>
                 </div>
               </div>

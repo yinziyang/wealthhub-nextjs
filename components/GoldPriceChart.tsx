@@ -19,6 +19,7 @@ interface ChartDataPoint {
 const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
   const [timeRange, setTimeRange] = useState<TimeRange>('24h');
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  const [selectedPoint, setSelectedPoint] = useState<(ChartDataPoint & { x: number; y: number }) | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,16 +33,16 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
       setError(null);
 
       try {
-        const url = timeRange === '24h' 
+        const url = timeRange === '24h'
           ? '/api/market-data/history?hours=24'
           : '/api/market-data/history?days=30';
-        
+
         const response = await fetch(url, {
           signal: controller.signal
         });
-        
+
         const result = await response.json();
-        
+
         if (!controller.signal.aborted) {
           if (result.success) {
             const data = parseMarketData(result.data, timeRange);
@@ -72,6 +73,11 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
     };
   }, [timeRange]);
 
+  // Reset selected point when data changes
+  useEffect(() => {
+    setSelectedPoint(null);
+  }, [timeRange, chartData]);
+
   // 解析市场数据为图表数据点
   const parseMarketData = (
     data: MarketDataHistoryResponse | MarketDataHourlyHistoryResponse,
@@ -96,7 +102,7 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
         // 使用本地时间构造函数，浏览器会自动处理时区
         const timestamp = new Date(year, month, day, hour, 0, 0).getTime();
         const price = goldPrices[key];
-        
+
         // 标签格式：HH:mm
         const label = `${String(hour).padStart(2, '0')}:00`;
 
@@ -107,7 +113,7 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
       // 生成完整的30天日期范围
       const today = new Date();
       const dateRange: string[] = [];
-      
+
       for (let i = 0; i < 30; i++) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
@@ -117,10 +123,10 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
         const dateKey = `${year}${month}${day}`;
         dateRange.push(dateKey);
       }
-      
+
       // 反转数组，使最早的日期在前
       dateRange.reverse();
-      
+
       // 为每一天创建数据点，即使价格为0也要包含
       dateRange.forEach((dateKey) => {
         const year = parseInt(dateKey.substring(0, 4));
@@ -131,7 +137,7 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
         const timestamp = new Date(year, month, day, 12, 0, 0).getTime();
         // 如果该日期有数据则使用，否则为0
         const price = goldPrices[dateKey] || 0;
-        
+
         // 标签格式：MM/DD
         const label = `${String(month + 1).padStart(2, '0')}/${String(day).padStart(2, '0')}`;
 
@@ -148,55 +154,73 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
       return null;
     }
 
-    const width = 320;
-    const height = 180;
-    const padding = { top: 20, right: 20, bottom: 30, left: 50 };
+    // 使用更大的基准宽度以保证清晰度，SVG会自动缩放适配容器
+    const width = 600;
+    const height = 300;
+    const padding = { top: 20, right: 30, bottom: 40, left: 60 };
     const chartWidth = width - padding.left - padding.right;
     const chartHeight = height - padding.top - padding.bottom;
 
-    // 过滤掉价格为0的数据点来计算价格范围（但保留所有数据点用于绘制）
+    // 过滤掉价格为0的数据点
     const validPrices = chartData.map(d => d.price).filter(p => p > 0);
     const minPrice = validPrices.length > 0 ? Math.min(...validPrices) : 0;
     const maxPrice = validPrices.length > 0 ? Math.max(...validPrices) : 0;
     const priceRange = maxPrice - minPrice || 1;
-    const pricePadding = priceRange * 0.1; // 10% 的上下边距
+    const pricePadding = priceRange * 0.1;
 
     const priceMin = Math.max(0, minPrice - pricePadding);
     const priceMax = maxPrice + pricePadding;
 
-    // 计算 X 坐标（时间）
     const timestamps = chartData.map(d => d.timestamp);
     const minTime = Math.min(...timestamps);
     const maxTime = Math.max(...timestamps);
     const timeRange = maxTime - minTime || 1;
 
-    // 生成路径点
-    const points = chartData.map((point, index) => {
+    // 生成坐标点
+    const points = chartData.map((point) => {
       const x = padding.left + (point.timestamp - minTime) / timeRange * chartWidth;
-      // 如果价格为0，显示在图表底部；否则按正常比例计算
       let y: number;
       if (point.price === 0) {
-        y = padding.top + chartHeight; // 底部
+        y = padding.top + chartHeight;
       } else {
         y = padding.top + chartHeight - ((point.price - priceMin) / (priceMax - priceMin)) * chartHeight;
       }
       return { x, y, ...point };
     });
 
-    // 生成折线路径
-    const pathData = points.map((point, index) => {
-      return index === 0 ? `M ${point.x} ${point.y}` : `L ${point.x} ${point.y}`;
-    }).join(' ');
+    // 生成平滑曲线路径 (Catmull-Rom spline 或 简单的 Bezier)
+    // 这里使用简单的三次贝塞尔曲线连接
+    const generateSmoothPath = (pts: Array<ChartDataPoint & { x: number; y: number }>) => {
+      if (pts.length === 0) return '';
+      if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`;
 
-    // 生成区域路径（用于渐变填充）
-    const areaPath = `${pathData} L ${points[points.length - 1].x} ${padding.top + chartHeight} L ${points[0].x} ${padding.top + chartHeight} Z`;
+      let path = `M ${pts[0].x} ${pts[0].y}`;
 
-    // 选择要显示的标签（最多显示 5 个）
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p0 = pts[i];
+        const p1 = pts[i + 1];
+
+        // 控制点计算 (简单的平滑处理)
+        const cp1x = p0.x + (p1.x - p0.x) / 3;
+        const cp1y = p0.y;
+        const cp2x = p1.x - (p1.x - p0.x) / 3;
+        const cp2y = p1.y;
+
+        path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p1.x} ${p1.y}`;
+      }
+      return path;
+    };
+
+    const smoothPathData = generateSmoothPath(points);
+
+    // 生成区域路径
+    const areaPath = `${smoothPathData} L ${points[points.length - 1].x} ${padding.top + chartHeight} L ${points[0].x} ${padding.top + chartHeight} Z`;
+
+    // 标签处理
     const labelCount = Math.min(5, points.length);
     const labelStep = Math.floor(points.length / labelCount);
     const labelPoints = points.filter((_, index) => index % labelStep === 0 || index === points.length - 1);
 
-    // 计算最高价和最低价（使用之前已经计算的 validPrices）
     const highestPrice = validPrices.length > 0 ? Math.max(...validPrices) : 0;
     const lowestPrice = validPrices.length > 0 ? Math.min(...validPrices) : 0;
 
@@ -209,7 +233,7 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
       priceMin,
       priceMax,
       points,
-      pathData,
+      pathData: smoothPathData, // 保持兼容性名称，但内容是平滑的
       areaPath,
       labelPoints,
       highestPrice,
@@ -227,21 +251,19 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setTimeRange('24h')}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              timeRange === '24h'
-                ? 'bg-yellow-500 dark:bg-yellow-600 text-white'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-            }`}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${timeRange === '24h'
+              ? 'bg-yellow-500 dark:bg-yellow-600 text-white'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+              }`}
           >
             24小时
           </button>
           <button
             onClick={() => setTimeRange('30d')}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              timeRange === '30d'
-                ? 'bg-yellow-500 dark:bg-yellow-600 text-white'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-            }`}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${timeRange === '30d'
+              ? 'bg-yellow-500 dark:bg-yellow-600 text-white'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+              }`}
           >
             30天
           </button>
@@ -278,9 +300,11 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
               </div>
             </div>
             <svg
-              width={chartConfig.width}
-              height={chartConfig.height}
+              width="100%"
+              height="100%"
+              viewBox={`0 0 ${chartConfig.width} ${chartConfig.height}`}
               className="overflow-visible"
+              preserveAspectRatio="none"
             >
               {/* 渐变定义 */}
               <defs>
@@ -326,7 +350,7 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
                 );
               })}
 
-              {/* 折线 */}
+              {/* 折线 (贝塞尔曲线平滑) */}
               <path
                 d={chartConfig.pathData}
                 fill="none"
@@ -337,22 +361,6 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
                 strokeDasharray={chartConfig.points.some(p => p.price === 0) ? "4,2" : "none"}
                 opacity={chartConfig.points.some(p => p.price === 0) ? 0.5 : 1}
               />
-
-              {/* 数据点（只显示价格大于0的点） */}
-              {chartConfig.points
-                .filter(point => point.price > 0)
-                .map((point, index) => (
-                  <circle
-                    key={index}
-                    cx={point.x}
-                    cy={point.y}
-                    r="3"
-                    fill="rgb(234, 179, 8)"
-                    stroke="white"
-                    strokeWidth="2"
-                    className="dark:stroke-slate-900"
-                  />
-                ))}
 
               {/* X 轴标签 */}
               {chartConfig.labelPoints.map((point, index) => (
@@ -380,6 +388,65 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
               >
                 元/克
               </text>
+
+              {/* Selected Point Highlight */}
+              {selectedPoint && (
+                <g pointerEvents="none">
+                  {/* Dashed Line */}
+                  <line
+                    x1={selectedPoint.x}
+                    y1={selectedPoint.y}
+                    x2={selectedPoint.x}
+                    y2={chartConfig.height - chartConfig.padding.bottom}
+                    stroke="rgb(234, 179, 8)"
+                    strokeWidth="1"
+                    strokeDasharray="4 4"
+                  />
+                  {/* Point Circle */}
+                  <circle
+                    cx={selectedPoint.x}
+                    cy={selectedPoint.y}
+                    r={4}
+                    fill="rgb(234, 179, 8)"
+                    stroke="white"
+                    strokeWidth="2"
+                  />
+                  {/* Price Text */}
+                  <text
+                    x={selectedPoint.x}
+                    y={selectedPoint.y - 12 < chartConfig.padding.top ? selectedPoint.y + 24 : selectedPoint.y - 12}
+                    textAnchor="middle"
+                    fontSize="12"
+                    fontWeight="bold"
+                    className="fill-slate-900 dark:fill-white"
+                  >
+                    {formatNumber(selectedPoint.price, 2)} 元/克
+                  </text>
+                </g>
+              )}
+
+              {/* Interaction Layer */}
+              {chartConfig.points.map((point, index) => {
+                const prevX = index > 0 ? chartConfig.points[index - 1].x : chartConfig.padding.left;
+                const nextX = index < chartConfig.points.length - 1 ? chartConfig.points[index + 1].x : chartConfig.width - chartConfig.padding.right;
+
+                // Calculate boundary for this click zone
+                const startX = index === 0 ? chartConfig.padding.left : (prevX + point.x) / 2;
+                const endX = index === chartConfig.points.length - 1 ? chartConfig.width - chartConfig.padding.right : (point.x + nextX) / 2;
+
+                return (
+                  <rect
+                    key={index}
+                    x={startX}
+                    y={chartConfig.padding.top}
+                    width={endX - startX}
+                    height={chartConfig.chartHeight}
+                    fill="transparent"
+                    className="cursor-pointer"
+                    onClick={() => setSelectedPoint(point)}
+                  />
+                );
+              })}
             </svg>
           </div>
         ) : (
