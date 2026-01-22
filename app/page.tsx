@@ -8,16 +8,20 @@ import AssetList from '@/components/AssetList';
 import BottomNav from '@/components/BottomNav';
 import AddAssetModal from '@/components/AddAssetModal';
 import ProfilePage from '@/components/ProfilePage';
+import GoldDetailPage from '@/components/GoldDetailPage';
 import AuthGuard from '@/components/AuthGuard';
 import { Asset } from '@/types';
 import { createAssetObject } from '@/utils';
 import type { MarketDataHistoryResponse } from '@/lib/api-response';
 
 type CurrentTab = 'assets' | 'profile';
+type AssetView = 'list' | 'gold-detail';
 
 function Dashboard() {
   const { user } = useAuth();
   const [currentTab, setCurrentTab] = useState<CurrentTab>('assets');
+  const [assetView, setAssetView] = useState<AssetView>('list');
+  const [selectedGoldAsset, setSelectedGoldAsset] = useState<Asset | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -119,7 +123,31 @@ function Dashboard() {
 
   const handleTabChange = (tab: CurrentTab) => {
     setCurrentTab(tab);
-    // 由于“资产/我的”在同一页面内切换，滚动位置会被复用；这里强制回到顶部
+    // 切换标签时重置资产视图为列表
+    if (tab === 'assets') {
+      setAssetView('list');
+      setSelectedGoldAsset(null);
+    }
+    // 由于"资产/我的"在同一页面内切换，滚动位置会被复用；这里强制回到顶部
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    });
+  };
+
+  const handleAssetClick = (asset: Asset) => {
+    // 只有黄金资产才显示详情页
+    if (asset.type === 'gold') {
+      setSelectedGoldAsset(asset);
+      setAssetView('gold-detail');
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      });
+    }
+  };
+
+  const handleBackToList = () => {
+    setAssetView('list');
+    setSelectedGoldAsset(null);
     requestAnimationFrame(() => {
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     });
@@ -129,14 +157,27 @@ function Dashboard() {
     <div className="bg-background-light dark:bg-background-dark font-display antialiased text-slate-900 dark:text-slate-50 transition-colors duration-200 min-h-screen flex justify-center">
       <div className="relative flex h-full min-h-screen w-full flex-col overflow-x-hidden max-w-md bg-background-light dark:bg-background-dark shadow-2xl">
         
-        <Header currentTab={currentTab} />
+        <Header 
+          currentTab={currentTab} 
+          assetView={assetView}
+          onBack={handleBackToList}
+        />
         
         <main className="flex-1 px-5 pt-[100px] pb-28 outline-none">
           {currentTab === 'assets' ? (
-            <>
-              <AssetOverview assets={assets} />
-              <AssetList assets={assets} marketData={marketData} isLoading={isMarketDataLoading} />
-            </>
+            assetView === 'gold-detail' && selectedGoldAsset ? (
+              <GoldDetailPage asset={selectedGoldAsset} marketData={marketData} />
+            ) : (
+              <>
+                <AssetOverview assets={assets} />
+                <AssetList 
+                  assets={assets} 
+                  marketData={marketData} 
+                  isLoading={isMarketDataLoading}
+                  onAssetClick={handleAssetClick}
+                />
+              </>
+            )
           ) : (
             <ProfilePage />
           )}

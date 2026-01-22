@@ -1,18 +1,22 @@
 'use client';
 
 import React from 'react';
-import { Bell } from 'lucide-react';
+import { Bell, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface HeaderProps {
   currentTab: 'assets' | 'profile';
+  assetView?: 'list' | 'gold-detail';
+  onBack?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ currentTab }) => {
+const Header: React.FC<HeaderProps> = ({ currentTab, assetView = 'list', onBack }) => {
   const { user, profile } = useAuth();
 
   const displayName = profile?.full_name || user?.email || '用户';
   const initialLetter = profile?.full_name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || '?';
+  
+  const isGoldDetail = currentTab === 'assets' && assetView === 'gold-detail';
   
   return (
     <header 
@@ -26,7 +30,24 @@ const Header: React.FC<HeaderProps> = ({ currentTab }) => {
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          {currentTab === 'assets' ? (
+          {isGoldDetail ? (
+            <>
+              <button
+                onClick={onBack}
+                className="flex items-center justify-center size-9 rounded-full bg-slate-100 dark:bg-surface-dark text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-surface-darker transition-colors outline-none focus:outline-none"
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <div>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium tracking-wider uppercase">
+                  Private Client
+                </p>
+                <h1 className="text-slate-900 dark:text-white text-lg font-bold leading-tight">
+                  实物黄金
+                </h1>
+              </div>
+            </>
+          ) : currentTab === 'assets' ? (
             <>
               <div className="relative size-10 shrink-0 rounded-full bg-primary/20 flex items-center justify-center">
                 <span className="text-primary font-bold">
@@ -53,7 +74,7 @@ const Header: React.FC<HeaderProps> = ({ currentTab }) => {
             </div>
           )}
         </div>
-        {currentTab === 'assets' && (
+        {currentTab === 'assets' && !isGoldDetail && (
           <div className="flex items-center gap-2">
             <button className="flex items-center justify-center size-9 rounded-full bg-slate-100 dark:bg-surface-dark text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-surface-darker transition-colors">
               <Bell size={20} />

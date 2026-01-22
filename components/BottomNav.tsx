@@ -11,7 +11,7 @@ interface BottomNavProps {
 
 const BottomNav: React.FC<BottomNavProps> = ({ onAddClick, currentTab, onTabChange }) => {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 mx-auto w-full max-w-md bg-white dark:bg-[#121316] pb-safe z-50 outline-none">
+    <nav className="fixed bottom-0 left-0 right-0 mx-auto w-full max-w-md bg-background-light dark:bg-background-dark pb-safe z-50 outline-none">
       <div className="flex items-center justify-center h-16 px-2 gap-12">
         <button 
           onClick={() => onTabChange('assets')}
@@ -26,7 +26,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ onAddClick, currentTab, onTabChan
         <div className="relative -top-4">
           <button 
             onClick={onAddClick}
-            className="flex items-center justify-center size-12 rounded-full bg-primary text-white shadow-lg shadow-primary/30 border-4 border-white dark:border-[#121316] hover:scale-105 active:scale-95 transition-transform outline-none focus:outline-none"
+            className="flex items-center justify-center size-12 rounded-full bg-primary text-white shadow-lg shadow-primary/30 border-4 border-background-light dark:border-background-dark hover:scale-105 active:scale-95 transition-transform outline-none focus:outline-none"
           >
             <Plus size={24} />
           </button>

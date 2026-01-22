@@ -6,14 +6,22 @@ import { getIcon } from './icons';
 
 interface AssetCardProps {
   asset: Asset;
+  onClick?: (asset: Asset) => void;
 }
 
-const AssetCard: React.FC<AssetCardProps> = ({ asset }) => {
+const AssetCard: React.FC<AssetCardProps> = ({ asset, onClick }) => {
   const hasChart = asset.chart.path && asset.chart.path !== '';
   const IconComponent = getIcon(asset.icon);
 
+  const handleClick = () => {
+    if (onClick) {
+      onClick(asset);
+    }
+  };
+
   return (
     <div 
+      onClick={handleClick}
       className="relative group overflow-hidden p-5 rounded-2xl bg-white dark:bg-surface-dark border border-slate-100 dark:border-white/5 shadow-sm active:scale-[0.98] transition-all cursor-pointer"
     >
       {hasChart && (

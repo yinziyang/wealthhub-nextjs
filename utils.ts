@@ -133,20 +133,21 @@ export function generateChartPath(history: Record<string, number>): string {
     return CHART_PATHS[Math.floor(Math.random() * CHART_PATHS.length)];
   }
   
+  // Sort by date key and filter valid values
   const sorted = entries.sort(([a], [b]) => {
-    const dateA = parseInt(a);
-    const dateB = parseInt(b);
-    return dateA - dateB;
+    return parseInt(a) - parseInt(b);
   });
   
-  const values = sorted.map(([, value]) => value).filter(v => v > 0);
+  const pointsData = sorted
+      .map(([, value]) => value)
+      .filter(v => v > 0);
   
-  if (values.length === 0) {
+  if (pointsData.length < 2) {
     return CHART_PATHS[Math.floor(Math.random() * CHART_PATHS.length)];
   }
   
-  const minVal = Math.min(...values);
-  const maxVal = Math.max(...values);
+  const minVal = Math.min(...pointsData);
+  const maxVal = Math.max(...pointsData);
   
   const heightRange = 80;
   const bottomPadding = 10;
@@ -154,30 +155,56 @@ export function generateChartPath(history: Record<string, number>): string {
   const getY = (value: number): number => {
     if (minVal === maxVal) return 50;
     const normalized = (value - minVal) / (maxVal - minVal);
+    // Map normalized 0-1 to Y 90-10 (SVG coordinates)
     return bottomPadding + heightRange - (normalized * heightRange);
   };
   
   const points: [number, number][] = [];
-  
-  sorted.forEach(([, value], index) => {
-    const x = (index / (sorted.length - 1)) * 100;
+  pointsData.forEach((value, index) => {
+    const x = (index / (pointsData.length - 1)) * 100;
     const y = getY(value);
     points.push([x, y]);
   });
   
-  if (points.length === 1) {
-    const [x, y] = points[0];
-    return `M${x},${y} L${x},${y} L100 100 L0 100 Z`;
+  // Smooth path generation using Bezier curves
+  const getControlPoint = (
+    current: [number, number],
+    previous: [number, number],
+    next: [number, number],
+    reverse: boolean = false
+  ): [number, number] => {
+    const p = previous || current;
+    const n = next || current;
+    const smoothing = 0.2;
+    
+    const lengthX = n[0] - p[0];
+    const lengthY = n[1] - p[1];
+    
+    const length = Math.sqrt(Math.pow(lengthX, 2) + Math.pow(lengthY, 2)) * smoothing;
+    const angle = Math.atan2(lengthY, lengthX) + (reverse ? Math.PI : 0);
+    
+    const x = current[0] + Math.cos(angle) * length;
+    const y = current[1] + Math.sin(angle) * length;
+    
+    return [x, y];
+  };
+
+  let d = `M ${points[0][0]},${points[0][1]}`;
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2];
+
+    const cp1 = getControlPoint(p1, p0, p2);
+    const cp2 = getControlPoint(p2, p1, p3, true);
+
+    d += ` C ${cp1[0]},${cp1[1]} ${cp2[0]},${cp2[1]} ${p2[0]},${p2[1]}`;
   }
   
-  let path = `M${points[0][0]},${points[0][1]}`;
+  // Add closing path with spaces to match AssetCard.tsx split('L 100 100')
+  d += ' L 100 100 L 0 100 Z';
   
-  for (let i = 1; i < points.length; i++) {
-    const [x, y] = points[i];
-    path += ` L${x},${y}`;
-  }
-  
-  path += ` L100 100 L0 100 Z`;
-  
-  return path;
+  return d;
 }
