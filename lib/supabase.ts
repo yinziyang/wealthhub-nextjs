@@ -45,6 +45,20 @@ export interface DailyMarketDataRow {
   updated_at: string;
 }
 
+export interface GoldPurchaseRecordRow {
+  id: string;
+  user_id: string;
+  purchase_date: string;
+  weight: number;
+  gold_price_per_gram: number;
+  handling_fee_per_gram: number;
+  purchase_channel: string;         // 购买渠道
+  total_price: number;
+  average_price_per_gram: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export async function saveExchangeRate(
   rate: number,
   updatedAt: string,
@@ -58,7 +72,7 @@ export async function saveExchangeRate(
         rate,
         updated_at: updatedAt,
         hour_key: hourKey,
-      } as any,
+      } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
       { onConflict: 'hour_key' }
     )
     .select()
@@ -87,7 +101,7 @@ export async function saveGoldPrice(
         price,
         updated_at: updatedAt,
         hour_key: hourKey,
-      } as any,
+      } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
       { onConflict: 'hour_key' }
     )
     .select()
@@ -127,7 +141,7 @@ export async function saveDailyMarketData({
         exchange_rate: exchangeRate,
         exchange_updated_at: exchangeUpdatedAt,
         updated_at: new Date().toISOString(),
-      } as any,
+      } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
       { onConflict: 'date' }
     )
     .select()

@@ -70,7 +70,6 @@ function Dashboard() {
 
   useEffect(() => {
     const controller = new AbortController();
-    let timeoutId: NodeJS.Timeout;
 
     const fetchMarketData = async () => {
       if (currentTab !== 'assets') return;
@@ -106,8 +105,8 @@ function Dashboard() {
       }
     };
 
-    // Debounce the fetch to avoid double-calling in Strict Mode
-    timeoutId = setTimeout(() => {
+    // Debounce to fetch to avoid double-calling in Strict Mode
+    const timeoutId = setTimeout(() => {
       fetchMarketData();
     }, 50);
 

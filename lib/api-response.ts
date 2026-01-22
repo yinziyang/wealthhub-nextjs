@@ -21,7 +21,7 @@ import { NextResponse } from 'next/server';
  *   "message": "操作成功"
  * }
  */
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: true;
   data: T;
   message?: string;
@@ -44,7 +44,7 @@ export interface ApiError {
   error: {
     code: string;
     message: string;
-    details?: any;
+    details?: unknown;
   };
 }
 
@@ -62,7 +62,7 @@ export interface ApiError {
  *   }
  * }
  */
-export interface ApiPaginatedResponse<T = any> extends ApiResponse<T[]> {
+export interface ApiPaginatedResponse<T = unknown> extends ApiResponse<T[]> {
   pagination: {
     page: number;
     pageSize: number;
@@ -209,7 +209,7 @@ export function errorResponse(
   code: ErrorCode,
   message: string,
   status?: HttpStatusCode,
-  details?: any
+  details?: unknown
 ): NextResponse {
   if (!status) {
     status = getStatusCodeForError(code);

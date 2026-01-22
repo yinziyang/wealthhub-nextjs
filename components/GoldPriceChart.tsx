@@ -26,7 +26,6 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
   // 获取市场数据
   useEffect(() => {
     const controller = new AbortController();
-    let timeoutId: NodeJS.Timeout;
 
     const fetchData = async () => {
       setIsLoading(true);
@@ -63,7 +62,7 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
       }
     };
 
-    timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       fetchData();
     }, 50);
 

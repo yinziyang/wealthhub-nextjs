@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { Toast } from 'antd-mobile';
 import { Asset, GoldPurchaseRecord } from '@/types';
 import { formatNumber } from '@/utils';
-import type { MarketDataHistoryResponse } from '@/lib/api-response';
+import { getGoldPurchases, deleteGoldPurchase } from '@/lib/api/gold-purchases';
+import { MarketDataHistoryResponse } from '@/lib/api-response';
 
 interface GoldPurchaseRecordsProps {
   asset: Asset;
@@ -11,119 +13,116 @@ interface GoldPurchaseRecordsProps {
   marketData?: MarketDataHistoryResponse | null;
 }
 
+interface RecordWithProfit extends GoldPurchaseRecord {
+  profitLoss: number;
+  currentValue: number;
+  purchaseCost: number;
+}
+
 const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
-  asset,
+  asset: _asset,
   currentGoldPrice,
-  marketData,
+  marketData: _marketData,
 }) => {
-  // 获取购买记录，如果没有则从 asset 数据推断
-  const purchaseRecords = useMemo(() => {
-    // 如果 asset 中有购买记录，直接使用
-    if (asset.purchaseRecords && asset.purchaseRecords.length > 0) {
-      return asset.purchaseRecords;
+  const [records, setRecords] = useState<GoldPurchaseRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchRecords() {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await getGoldPurchases();
+        setRecords(data);
+      } catch (err) {
+        console.error('获取黄金买入记录失败:', err);
+        setError(err instanceof Error ? err.message : '获取数据失败');
+      } finally {
+        setLoading(false);
+      }
     }
 
-    // 测试数据：创建5个购买记录用于UI展示
-    const testRecords: GoldPurchaseRecord[] = [
-      {
-        id: `${asset.id}-test-1`,
-        date: '2026-01-19',
-        weight: 250,
-        goldPrice: 1043.6,
-        handlingFee: 15,
-      },
-      {
-        id: `${asset.id}-test-2`,
-        date: '2026-01-14',
-        weight: 100,
-        goldPrice: 1033.4,
-        handlingFee: 20,
-      },
-      {
-        id: `${asset.id}-test-3`,
-        date: '2026-01-10',
-        weight: 500,
-        goldPrice: 1025.0,
-        handlingFee: 12,
-      },
-      {
-        id: `${asset.id}-test-4`,
-        date: '2026-01-05',
-        weight: 300,
-        goldPrice: 1018.5,
-        handlingFee: 18,
-      },
-      {
-        id: `${asset.id}-test-5`,
-        date: '2025-12-28',
-        weight: 200,
-        goldPrice: 1005.2,
-        handlingFee: 15,
-      },
-    ];
+    fetchRecords();
+  }, []);
 
-    // 返回测试数据
-    return testRecords;
+  const _handleDelete = useCallback(async (recordId: string) => {
+    const previousRecords = [...records];
 
-    // 原始逻辑：从 asset 数据推断（暂时注释，使用测试数据）
-    // // 否则从 asset 的 subtitle 和 date 推断一条记录
-    // // 从 subtitle 提取重量（例如："重量 5,000g"）
-    // const weightMatch = asset.subtitle.match(/(\d+(?:,\d+)*)g/);
-    // const weight = weightMatch ? parseFloat(weightMatch[1].replace(/,/g, '')) : 0;
+    setRecords(prev => prev.filter(r => r.id !== recordId));
 
-    // // 从 subAmount 提取金价（例如："¥480 /g"）
-    // const priceMatch = asset.subAmount.match(/¥(\d+(?:\.\d+)?)/);
-    // const goldPrice = priceMatch ? parseFloat(priceMatch[1]) : 0;
+    try {
+      await deleteGoldPurchase(recordId);
+      Toast.show({ content: '删除成功', position: 'bottom' });
+    } catch (err) {
+      setRecords(previousRecords);
+      Toast.show({
+        content: err instanceof Error ? err.message : '删除失败，请重试',
+        position: 'bottom',
+      });
+    }
+  }, [records]);
 
-    // // 从 amount 和 weight、goldPrice 计算手续费
-    // // amount = weight * (goldPrice + handlingFee)
-    // // handlingFee = (amount / weight) - goldPrice
-    // const totalCost = Math.abs(asset.amount);
-    // const handlingFee = weight > 0 && goldPrice > 0 
-    //   ? (totalCost / weight) - goldPrice 
-    //   : 0;
-
-    // if (weight > 0 && goldPrice > 0 && asset.date) {
-    //   return [{
-    //     id: `${asset.id}-record-1`,
-    //     date: asset.date,
-    //     weight,
-    //     goldPrice,
-    //     handlingFee: Math.max(0, handlingFee), // 确保手续费不为负
-    //   }];
-    // }
-
-    // return [];
-  }, [asset]);
-
-  // 计算每条记录的盈利/亏损
-  const recordsWithProfit = useMemo(() => {
-    return purchaseRecords.map(record => {
-      // 当前市值 = 重量 * 当前金价
+  const recordsWithProfit = useMemo<RecordWithProfit[]>(() => {
+    return records.map(record => {
       const currentValue = record.weight * currentGoldPrice;
-      // 购买成本 = 重量 * (金价 + 手续费)
-      const purchaseCost = record.weight * (record.goldPrice + record.handlingFee);
-      // 盈利/亏损 = 当前市值 - 购买成本
-      const profitLoss = currentValue - purchaseCost;
+      const profitLoss = currentValue - record.total_price;
 
       return {
         ...record,
         profitLoss,
         currentValue,
-        purchaseCost,
+        purchaseCost: record.total_price,
       };
     });
-  }, [purchaseRecords, currentGoldPrice]);
+  }, [records, currentGoldPrice]);
 
-  // 按日期降序排列（最新的在前）
-  const sortedRecords = useMemo(() => {
-    return [...recordsWithProfit].sort((a, b) => {
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
+  const formatDate = (dateStr: string): string => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
     });
-  }, [recordsWithProfit]);
+  };
 
-  if (sortedRecords.length === 0) {
-    return null;
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        <div className="text-slate-900 dark:text-white text-base font-bold px-1">
+          购买记录
+        </div>
+        <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+          加载中...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-3">
+        <div className="text-slate-900 dark:text-white text-base font-bold px-1">
+          购买记录
+        </div>
+        <div className="text-center py-8 text-red-500">
+          {error}
+        </div>
+      </div>
+    );
+  }
+
+  if (recordsWithProfit.length === 0) {
+    return (
+      <div className="space-y-3">
+        <div className="text-slate-900 dark:text-white text-base font-bold px-1">
+          购买记录
+        </div>
+        <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+          暂无购买记录
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -132,69 +131,77 @@ const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
         <div className="text-slate-900 dark:text-white text-base font-bold">
           购买记录
         </div>
-        <div className="text-xs text-slate-500 font-normal">
-          {sortedRecords.length}笔交易
+        <div className="text-xs text-slate-500 dark:text-slate-400 font-normal">
+          {recordsWithProfit.length}笔交易
         </div>
       </div>
 
       <div className="grid gap-2.5 max-h-[400px] overflow-y-auto pr-1">
-        {sortedRecords.map((record) => {
-          const goldPriceAmount = record.weight * record.goldPrice;
-          const handlingFeeAmount = record.weight * record.handlingFee;
-          const totalAmount = goldPriceAmount + handlingFeeAmount;
-
-          return (
-            <div
-              key={record.id}
-              className="rounded-xl bg-surface-darker border border-[rgba(167,125,47,0.12)] p-3 shadow-sm"
-            >
-              {/* 第一行：主要信息 (克重、日期、总盈亏) */}
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-lg font-bold text-slate-900 dark:text-white">
-                    {formatNumber(record.weight, 0)}<span className="text-xs font-normal text-slate-500 ml-0.5">g</span>
-                  </span>
-                  <span className="text-xs text-slate-400">
-                    {record.date}
-                  </span>
-                </div>
-                <div className={`text-sm font-bold ${record.profitLoss >= 0
+        {recordsWithProfit.map((record) => (
+          <div
+            key={record.id}
+            className="rounded-xl bg-surface-darker border border-[rgba(167,125,47,0.12)] p-3 shadow-sm"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-baseline gap-2">
+                <span className="text-lg font-bold text-slate-900 dark:text-white">
+                  {formatNumber(record.weight, 0)}
+                  <span className="text-xs font-normal text-slate-500 ml-0.5">g</span>
+                </span>
+                <span className="text-xs text-slate-400">
+                  {formatDate(record.purchase_date)}
+                </span>
+              </div>
+              <div className={`text-sm font-bold ${
+                record.profitLoss >= 0
                   ? 'text-emerald-500'
                   : 'text-red-500'
-                  }`}>
-                  {record.profitLoss >= 0 ? '+' : ''}¥{formatNumber(record.profitLoss, 0)}
+              }`}>
+                {record.profitLoss >= 0 ? '+' : ''}¥{formatNumber(record.profitLoss, 0)}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100 dark:border-white/5">
+              <div className="flex flex-col gap-1 text-slate-500 dark:text-slate-400">
+                <div className="flex items-center gap-1.5">
+                  <span className="opacity-70">金价</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                    ¥{formatNumber(record.gold_price_per_gram, 1)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="opacity-70">工费</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                    ¥{formatNumber(record.handling_fee_per_gram, 0)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="opacity-70">渠道</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                    {record.purchase_channel}
+                  </span>
                 </div>
               </div>
 
-              {/* 第二行：详细数据 */}
-              <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100 dark:border-white/5">
-                {/* 左侧：单价信息 */}
-                <div className="flex flex-col gap-1 text-slate-500 dark:text-slate-400">
-                  <div className="flex items-center gap-1.5">
-                    <span className="opacity-70">金价</span>
-                    <span className="font-medium text-slate-700 dark:text-slate-300">¥{formatNumber(record.goldPrice, 1)}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="opacity-70">工费</span>
-                    <span className="font-medium text-slate-700 dark:text-slate-300">¥{formatNumber(record.handlingFee, 0)}</span>
-                  </div>
+              <div className="flex flex-col gap-1 items-end text-slate-500 dark:text-slate-400">
+                <div className="flex items-center gap-1">
+                  <span className="font-medium text-slate-700 dark:text-slate-300">
+                    ¥{formatNumber(record.weight * record.gold_price_per_gram, 0)}
+                  </span>
+                  <span className="opacity-70 text-[10px]">
+                    + ¥{formatNumber(record.weight * record.handling_fee_per_gram, 0)}
+                  </span>
                 </div>
-
-                {/* 右侧：总成本构成 */}
-                <div className="flex flex-col gap-1 items-end text-slate-500 dark:text-slate-400">
-                  <div className="flex items-center gap-1">
-                    <span className="font-medium text-slate-700 dark:text-slate-300">¥{formatNumber(goldPriceAmount, 0)}</span>
-                    <span className="opacity-70 text-[10px]">+ ¥{formatNumber(handlingFeeAmount, 0)}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="opacity-70">总成本</span>
-                    <span className="font-bold text-yellow-600 dark:text-yellow-500 text-sm">¥{formatNumber(totalAmount, 0)}</span>
-                  </div>
+                <div className="flex items-center gap-1">
+                  <span className="opacity-70">总成本</span>
+                  <span className="font-bold text-yellow-600 dark:text-yellow-500 text-sm">
+                    ¥{formatNumber(record.total_price, 0)}
+                  </span>
                 </div>
               </div>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
     </div>
   );
