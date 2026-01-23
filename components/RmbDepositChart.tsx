@@ -2,10 +2,13 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { formatNumber } from '@/utils';
-import { getRmbDepositChartData } from '@/lib/api/rmb-deposits';
+import { RmbDepositChartItem } from '@/types';
 
 interface RmbDepositChartProps {
   className?: string;
+  chartData: RmbDepositChartItem[];
+  isLoading?: boolean;
+  error?: string | null;
 }
 
 interface ChartDataPoint {
@@ -15,55 +18,31 @@ interface ChartDataPoint {
   bankNames: string;
 }
 
-const RmbDepositChart: React.FC<RmbDepositChartProps> = ({ className }) => {
-  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+const RmbDepositChart: React.FC<RmbDepositChartProps> = ({ className, chartData: rawChartData, isLoading = false, error: externalError = null }) => {
   const [selectedPoint, setSelectedPoint] = useState<(ChartDataPoint & { x: number; y: number }) | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const controller = new AbortController();
+  // 将传入的图表数据转换为图表点数据
+  const chartData = useMemo<ChartDataPoint[]>(() => {
+    if (rawChartData.length === 0) return [];
 
-    const fetchData = async () => {
-      setIsLoading(true);
-      setError(null);
+    return rawChartData.reduce((acc, item, index) => {
+      const prevTotal = index > 0 ? acc[index - 1].cumulative : 0;
+      const year = parseInt(item.date.substring(0, 4), 10);
+      const month = parseInt(item.date.substring(4, 6), 10) - 1;
+      const day = parseInt(item.date.substring(6, 8), 10);
+      const date = new Date(year, month, day);
+      const timestamp = date.getTime();
+      const label = `${item.date.substring(4, 6)}/${item.date.substring(6, 8)}`;
 
-      try {
-        const data = await getRmbDepositChartData();
-        const cumulativeData = data.reduce((acc, item, index) => {
-          const prevTotal = index > 0 ? acc[index - 1].cumulative : 0;
-          const year = parseInt(item.date.substring(0, 4), 10);
-          const month = parseInt(item.date.substring(4, 6), 10) - 1;
-          const day = parseInt(item.date.substring(6, 8), 10);
-          const date = new Date(year, month, day);
-          const timestamp = date.getTime();
-          const label = `${item.date.substring(4, 6)}/${item.date.substring(6, 8)}`;
-
-          acc.push({
-            timestamp,
-            cumulative: prevTotal + item.amount,
-            label,
-            bankNames: item.bank_name
-          });
-          return acc;
-        }, [] as ChartDataPoint[]);
-
-        setChartData(cumulativeData);
-      } catch (err) {
-        console.error('获取人民币存款图表数据失败:', err);
-        setError('获取数据失败');
-        setChartData([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-
-    return () => {
-      controller.abort();
-    };
-  }, []);
+      acc.push({
+        timestamp,
+        cumulative: prevTotal + item.amount,
+        label,
+        bankNames: item.bank_name
+      });
+      return acc;
+    }, [] as ChartDataPoint[]);
+  }, [rawChartData]);
 
   useEffect(() => {
     setSelectedPoint(null);
@@ -153,9 +132,9 @@ const RmbDepositChart: React.FC<RmbDepositChartProps> = ({ className }) => {
           <div className="flex items-center justify-center h-[180px]">
             <div className="text-slate-500 dark:text-slate-400 text-sm">加载中...</div>
           </div>
-        ) : error ? (
+        ) : externalError ? (
           <div className="flex items-center justify-center h-[180px]">
-            <div className="text-red-500 dark:text-red-400 text-sm">{error}</div>
+            <div className="text-red-500 dark:text-red-400 text-sm">{externalError}</div>
           </div>
         ) : chartConfig && chartData.length > 0 ? (
           <div className="relative">

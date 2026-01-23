@@ -35,6 +35,7 @@ export function createAssetObject(
     exchangeRate?: number;
     goldPrice?: number;
     handlingFee?: number;
+    debtCount?: number; // 新增字段
   },
   date?: string,
   id?: string
@@ -86,7 +87,12 @@ export function createAssetObject(
       iconBgColor = 'bg-indigo-500/10';
       iconColor = 'text-indigo-500';
       chartColor = '#6366f1';
-      subtitle = isIncrease ? '借出款项' : '收回款项';
+      // 更新 subtitle 逻辑，支持显示笔数
+      if (details.debtCount !== undefined && details.debtCount > 0) {
+        subtitle = isIncrease ? `借出款项 ${details.debtCount}笔` : '收回款项';
+      } else {
+        subtitle = isIncrease ? '借出款项' : '收回款项';
+      }
       subAmount = isIncrease ? '待收回' : '已结清';
       subAmountColor = 'text-slate-500';
       break;

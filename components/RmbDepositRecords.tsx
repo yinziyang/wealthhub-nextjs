@@ -1,52 +1,16 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { RmbDepositRecord } from '@/types';
 import { formatNumber } from '@/utils';
-import { getRmbDeposits } from '@/lib/api/rmb-deposits';
 
-const RmbDepositRecords: React.FC = () => {
-  const [records, setRecords] = useState<RmbDepositRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+interface RmbDepositRecordsProps {
+  records: RmbDepositRecord[];
+  loading: boolean;
+  error: string | null;
+}
 
-  useEffect(() => {
-    async function fetchRecords() {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await getRmbDeposits();
-        setRecords(data);
-      } catch (err) {
-        console.error('获取人民币存款记录失败:', err);
-        setError(err instanceof Error ? err.message : '获取数据失败');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchRecords();
-  }, []);
-
-  useEffect(() => {
-    if (records.length > 0) {
-      const countEl = document.getElementById('deposit-count');
-      if (countEl) countEl.textContent = `${records.length} 笔`;
-
-      const sortedRecords = [...records].sort(
-        (a, b) => new Date(a.deposit_date).getTime() - new Date(b.deposit_date).getTime()
-      );
-      const earliestEl = document.getElementById('earliest-date');
-      if (earliestEl) {
-        const date = new Date(sortedRecords[0].deposit_date);
-        earliestEl.textContent = date.toLocaleDateString('zh-CN', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-        });
-      }
-    }
-  }, [records]);
+const RmbDepositRecords: React.FC<RmbDepositRecordsProps> = ({ records, loading, error }) => {
 
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr);

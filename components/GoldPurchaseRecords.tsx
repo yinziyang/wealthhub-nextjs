@@ -18,6 +18,9 @@ interface RecordWithProfit extends GoldPurchaseRecord {
   purchaseCost: number;
 }
 
+// 模块级别的请求缓存，防止 React Strict Mode 导致重复请求
+let globalFetchPromiseGold: Promise<GoldPurchaseRecord[]> | null = null;
+
 const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
   currentGoldPrice,
 }) => {
@@ -25,22 +28,60 @@ const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // 统一获取数据，只调用一次 API（使用模块级缓存防止 React Strict Mode 导致重复请求）
   useEffect(() => {
+    let isCancelled = false;
+
     async function fetchRecords() {
+      // 如果已经有正在进行的全局请求，复用它
+      if (globalFetchPromiseGold) {
+        try {
+          const data = await globalFetchPromiseGold;
+          if (!isCancelled) {
+            setRecords(data);
+            setLoading(false);
+          }
+        } catch (err) {
+          if (!isCancelled) {
+            console.error('获取黄金买入记录失败:', err);
+            setError(err instanceof Error ? err.message : '获取数据失败');
+            setLoading(false);
+          }
+        }
+        return;
+      }
+
+      // 创建新的请求并缓存到全局变量
+      setLoading(true);
+      setError(null);
+      globalFetchPromiseGold = getGoldPurchases();
+
       try {
-        setLoading(true);
-        setError(null);
-        const data = await getGoldPurchases();
-        setRecords(data);
+        const data = await globalFetchPromiseGold;
+        
+        // 如果组件已卸载或请求被取消，不更新状态
+        if (!isCancelled) {
+          setRecords(data);
+        }
       } catch (err) {
-        console.error('获取黄金买入记录失败:', err);
-        setError(err instanceof Error ? err.message : '获取数据失败');
+        if (!isCancelled) {
+          console.error('获取黄金买入记录失败:', err);
+          setError(err instanceof Error ? err.message : '获取数据失败');
+        }
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
+        // 请求完成后立即清除全局缓存
+        globalFetchPromiseGold = null;
       }
     }
 
     fetchRecords();
+
+    return () => {
+      isCancelled = true;
+    };
   }, []);
 
   const recordsWithProfit = useMemo<RecordWithProfit[]>(() => {

@@ -68,12 +68,14 @@ function Dashboard() {
 
     const debtRecords = Object.values(portfolioData['debt-records']);
     const debtAmount = debtRecords.reduce((sum, r) => sum + r.amount, 0);
+    const debtCount = debtRecords.length; // 计算债权笔数
 
     return [
       createAssetObject('rmb', '人民币存款', rmbAmount, true, {}, today, 'portfolio-rmb'),
       createAssetObject('usd', '美元资产', usdAmount, true, { usdAmount: totalUsd, exchangeRate }, today, 'portfolio-usd'),
       createAssetObject('gold', '实物黄金', goldAmount, true, { weight: totalWeight, goldPrice }, today, 'portfolio-gold'),
-      createAssetObject('debt', '债权资产', debtAmount, true, {}, today, 'portfolio-debt'),
+      // 传递 debtCount
+      createAssetObject('debt', '债权资产', debtAmount, true, { debtCount }, today, 'portfolio-debt'),
     ];
   };
 
@@ -264,7 +266,7 @@ function Dashboard() {
               <DebtDetailPage asset={selectedDebtAsset} />
             ) : (
               <>
-                <AssetOverview assets={assets} />
+                <AssetOverview assets={assets} isLoading={isPortfolioLoading} />
                 <AssetList
                   assets={assets}
                   marketData={marketData}

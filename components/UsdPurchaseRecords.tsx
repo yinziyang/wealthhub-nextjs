@@ -18,6 +18,9 @@ interface RecordWithProfit extends UsdPurchaseRecord {
   purchaseCost: number;
 }
 
+// 模块级别的请求缓存，防止 React Strict Mode 导致重复请求
+let globalFetchPromiseUsd: Promise<UsdPurchaseRecord[]> | null = null;
+
 const UsdPurchaseRecords: React.FC<UsdPurchaseRecordsProps> = ({
   currentExchangeRate,
 }) => {
@@ -25,22 +28,60 @@ const UsdPurchaseRecords: React.FC<UsdPurchaseRecordsProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // 统一获取数据，只调用一次 API（使用模块级缓存防止 React Strict Mode 导致重复请求）
   useEffect(() => {
+    let isCancelled = false;
+
     async function fetchRecords() {
+      // 如果已经有正在进行的全局请求，复用它
+      if (globalFetchPromiseUsd) {
+        try {
+          const data = await globalFetchPromiseUsd;
+          if (!isCancelled) {
+            setRecords(data);
+            setLoading(false);
+          }
+        } catch (err) {
+          if (!isCancelled) {
+            console.error('获取美元购汇记录失败:', err);
+            setError(err instanceof Error ? err.message : '获取数据失败');
+            setLoading(false);
+          }
+        }
+        return;
+      }
+
+      // 创建新的请求并缓存到全局变量
+      setLoading(true);
+      setError(null);
+      globalFetchPromiseUsd = getUsdPurchases();
+
       try {
-        setLoading(true);
-        setError(null);
-        const data = await getUsdPurchases();
-        setRecords(data);
+        const data = await globalFetchPromiseUsd;
+        
+        // 如果组件已卸载或请求被取消，不更新状态
+        if (!isCancelled) {
+          setRecords(data);
+        }
       } catch (err) {
-        console.error('获取美元购汇记录失败:', err);
-        setError(err instanceof Error ? err.message : '获取数据失败');
+        if (!isCancelled) {
+          console.error('获取美元购汇记录失败:', err);
+          setError(err instanceof Error ? err.message : '获取数据失败');
+        }
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
+        // 请求完成后立即清除全局缓存
+        globalFetchPromiseUsd = null;
       }
     }
 
     fetchRecords();
+
+    return () => {
+      isCancelled = true;
+    };
   }, []);
 
   const recordsWithProfit = useMemo<RecordWithProfit[]>(() => {

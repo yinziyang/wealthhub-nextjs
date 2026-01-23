@@ -47,8 +47,13 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, onClick, isLoading = false
       }
       // For rmb and usd, subtitle is static text or loading
       if (asset.type === 'usd') {
-        // 美元不需要subtitle骨架
-        return asset.subtitle;
+        return (
+          <div className="flex items-center gap-1">
+            <span>$</span>
+            <SkeletonPulse className="w-10 h-3 inline-block align-middle" />
+            <span>USD</span>
+          </div>
+        );
       }
       // RMB
       return asset.subtitle;
