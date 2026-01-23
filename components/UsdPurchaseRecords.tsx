@@ -1,27 +1,27 @@
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { Asset, GoldPurchaseRecord } from '@/types';
+import { Asset, UsdPurchaseRecord } from '@/types';
 import { formatNumber } from '@/utils';
-import { getGoldPurchases } from '@/lib/api/gold-purchases';
+import { getUsdPurchases } from '@/lib/api/usd-purchases';
 import { MarketDataHistoryResponse } from '@/lib/api-response';
 
-interface GoldPurchaseRecordsProps {
+interface UsdPurchaseRecordsProps {
   asset: Asset;
-  currentGoldPrice: number;
+  currentExchangeRate: number;
   marketData?: MarketDataHistoryResponse | null;
 }
 
-interface RecordWithProfit extends GoldPurchaseRecord {
+interface RecordWithProfit extends UsdPurchaseRecord {
   profitLoss: number;
   currentValue: number;
   purchaseCost: number;
 }
 
-const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
-  currentGoldPrice,
+const UsdPurchaseRecords: React.FC<UsdPurchaseRecordsProps> = ({
+  currentExchangeRate,
 }) => {
-  const [records, setRecords] = useState<GoldPurchaseRecord[]>([]);
+  const [records, setRecords] = useState<UsdPurchaseRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,10 +30,10 @@ const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
       try {
         setLoading(true);
         setError(null);
-        const data = await getGoldPurchases();
+        const data = await getUsdPurchases();
         setRecords(data);
       } catch (err) {
-        console.error('获取黄金买入记录失败:', err);
+        console.error('获取美元购汇记录失败:', err);
         setError(err instanceof Error ? err.message : '获取数据失败');
       } finally {
         setLoading(false);
@@ -45,17 +45,17 @@ const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
 
   const recordsWithProfit = useMemo<RecordWithProfit[]>(() => {
     return records.map(record => {
-      const currentValue = record.weight * currentGoldPrice;
-      const profitLoss = currentValue - record.total_price;
+      const currentValue = record.usd_amount * currentExchangeRate;
+      const profitLoss = currentValue - record.total_rmb_amount;
 
       return {
         ...record,
         profitLoss,
         currentValue,
-        purchaseCost: record.total_price,
+        purchaseCost: record.total_rmb_amount,
       };
     });
-  }, [records, currentGoldPrice]);
+  }, [records, currentExchangeRate]);
 
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr);
@@ -70,7 +70,7 @@ const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
     return (
       <div className="space-y-3">
         <div className="text-slate-900 dark:text-white text-base font-bold px-1">
-          购买记录
+          购汇记录
         </div>
         <div className="text-center py-8 text-slate-500 dark:text-slate-400">
           加载中...
@@ -83,7 +83,7 @@ const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
     return (
       <div className="space-y-3">
         <div className="text-slate-900 dark:text-white text-base font-bold px-1">
-          购买记录
+          购汇记录
         </div>
         <div className="text-center py-8 text-red-500">
           {error}
@@ -96,10 +96,10 @@ const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
     return (
       <div className="space-y-3">
         <div className="text-slate-900 dark:text-white text-base font-bold px-1">
-          购买记录
+          购汇记录
         </div>
         <div className="text-center py-8 text-slate-500 dark:text-slate-400">
-          暂无购买记录
+          暂无购汇记录
         </div>
       </div>
     );
@@ -109,7 +109,7 @@ const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
     <div className="space-y-3">
       <div className="flex items-center justify-between px-1">
         <div className="text-slate-900 dark:text-white text-base font-bold">
-          购买记录
+          购汇记录
         </div>
         <div className="text-xs text-slate-500 dark:text-slate-400 font-normal">
           {recordsWithProfit.length}笔交易
@@ -120,13 +120,13 @@ const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
         {recordsWithProfit.map((record) => (
           <div
             key={record.id}
-            className="rounded-xl bg-surface-darker border border-[rgba(167,125,47,0.12)] p-3 shadow-sm"
+            className="rounded-xl bg-surface-darker border border-[rgba(34,197,94,0.12)] p-3 shadow-sm"
           >
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-baseline gap-2">
                 <span className="text-lg font-bold text-slate-900 dark:text-white">
-                  {formatNumber(record.weight, 0)}
-                  <span className="text-xs font-normal text-slate-500 ml-0.5">g</span>
+                  {formatNumber(record.usd_amount, 2)}
+                  <span className="text-xs font-normal text-slate-500 ml-0.5">USD</span>
                 </span>
                 <span className="text-xs text-slate-400">
                   {formatDate(record.purchase_date)}
@@ -144,15 +144,9 @@ const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
             <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100 dark:border-white/5">
               <div className="flex flex-col gap-1 text-slate-500 dark:text-slate-400">
                 <div className="flex items-center gap-1.5">
-                  <span className="opacity-70">金价</span>
+                  <span className="opacity-70">汇率</span>
                   <span className="font-medium text-slate-700 dark:text-slate-300">
-                    ¥{formatNumber(record.gold_price_per_gram, 1)}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="opacity-70">工费</span>
-                  <span className="font-medium text-slate-700 dark:text-slate-300">
-                    ¥{formatNumber(record.handling_fee_per_gram, 0)}
+                    {formatNumber(record.exchange_rate, 4)}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -165,17 +159,9 @@ const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
 
               <div className="flex flex-col gap-1 items-end text-slate-500 dark:text-slate-400">
                 <div className="flex items-center gap-1">
-                  <span className="font-medium text-slate-700 dark:text-slate-300">
-                    ¥{formatNumber(record.weight * record.gold_price_per_gram, 0)}
-                  </span>
-                  <span className="opacity-70 text-[10px]">
-                    + ¥{formatNumber(record.weight * record.handling_fee_per_gram, 0)}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="opacity-70">总成本</span>
-                  <span className="font-bold text-yellow-600 dark:text-yellow-500 text-sm">
-                    ¥{formatNumber(record.total_price, 0)}
+                  <span className="opacity-70">成本</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-500 text-sm">
+                    ¥{formatNumber(record.total_rmb_amount, 0)}
                   </span>
                 </div>
               </div>
@@ -187,4 +173,4 @@ const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
   );
 };
 
-export default GoldPurchaseRecords;
+export default UsdPurchaseRecords;

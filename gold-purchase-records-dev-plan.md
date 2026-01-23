@@ -106,10 +106,11 @@ create table public.gold_purchase_records (
   user_id uuid not null references auth.users(id) on delete cascade,
 
   -- 用户输入字段
-  purchase_date timestamptz not null,              -- 买入日期时间（精确到秒）
-  weight numeric(12, 4) not null,                  -- 买入克重（最多 12 位整数，4 位小数）
-  gold_price_per_gram numeric(10, 2) not null,     -- 买入金价（元/克）
-  handling_fee_per_gram numeric(10, 2) not null,   -- 买入手续费（元/克）
+  purchase_date timestamptz not null,                      -- 买入日期时间（精确到秒）
+  weight numeric(12, 4) not null,                          -- 买入克重（最多 12 位整数，4 位小数）
+  gold_price_per_gram numeric(10, 2) not null,             -- 买入金价（元/克）
+  handling_fee_per_gram numeric(10, 2) not null,           -- 买入手续费（元/克）
+  purchase_channel VARCHAR(100) NOT NULL DEFAULT '未填写'; -- 购买渠道（用户自定义）
 
   -- 自动计算字段（由触发器填充）
   total_price numeric(15, 2),                      -- 总价 = 克重 × (金价 + 手续费)
@@ -135,6 +136,7 @@ comment on column public.gold_purchase_records.gold_price_per_gram is '买入金
 comment on column public.gold_purchase_records.handling_fee_per_gram is '手续费（元/克）';
 comment on column public.gold_purchase_records.total_price is '总价（自动计算）';
 comment on column public.gold_purchase_records.average_price_per_gram is '平均克价（自动计算）';
+comment on column public.gold_purchase_records.purchase_channel is '购买渠道';
 
 -- 4. 创建索引（优化查询性能）
 create index idx_gold_purchase_records_user_id
@@ -234,6 +236,7 @@ create trigger trg_gold_purchase_updated_at
 | average_price_per_gram | numeric | 平均克价（自动） |
 | created_at | timestamptz | 创建时间 |
 | updated_at | timestamptz | 更新时间 |
+| purchase_channel | varchar | 购买渠道 |
 
 ### 2.6 验证 RLS 策略
 

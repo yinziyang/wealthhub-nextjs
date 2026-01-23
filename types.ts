@@ -42,6 +42,39 @@ export interface UpdateGoldPurchaseRequest {
   purchase_channel?: string;        // 购买渠道（可选）
 }
 
+// ============================================================
+// 美元购汇记录类型定义
+// ============================================================
+
+// 数据库记录类型（与数据库字段一一对应）
+export interface UsdPurchaseRecord {
+  id: string;
+  user_id: string;
+  purchase_date: string;           // ISO 8601 格式的时间戳
+  usd_amount: number;              // 美元金额
+  exchange_rate: number;           // 购汇汇率
+  purchase_channel: string;        // 购汇渠道（必填）
+  total_rmb_amount: number;        // 折合人民币总额（自动计算）
+  created_at: string;
+  updated_at: string;
+}
+
+// 创建记录的请求参数（不包含自动计算字段）
+export interface CreateUsdPurchaseRequest {
+  purchase_date: string;
+  usd_amount: number;
+  exchange_rate: number;
+  purchase_channel: string;        // 购汇渠道（必填）
+}
+
+// 更新记录的请求参数（所有字段可选）
+export interface UpdateUsdPurchaseRequest {
+  purchase_date?: string;
+  usd_amount?: number;
+  exchange_rate?: number;
+  purchase_channel?: string;       // 购汇渠道（可选）
+}
+
 export interface Asset {
   id: string;
   type: 'rmb' | 'usd' | 'gold' | 'debt';
@@ -56,8 +89,8 @@ export interface Asset {
   iconColor: string;
   chart: ChartConfig;
   date?: string;
-  // 黄金购买记录（仅当 type === 'gold' 时使用）
-  purchaseRecords?: GoldPurchaseRecord[];
+  // 购买记录（根据 type 字段区分类型，详情页内部独立获取，此字段预留扩展）
+  purchaseRecords?: GoldPurchaseRecord[] | UsdPurchaseRecord[];
 }
 
 export interface DistributionItem {

@@ -53,6 +53,7 @@ const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose, onSave }
   const DEFAULT_EXCHANGE_RATE = 7.24;
   const DEFAULT_GOLD_PRICE = 612.50;
   
+  const [currentGoldPrice, setCurrentGoldPrice] = useState<number>(DEFAULT_GOLD_PRICE);
   const [customExchangeRate, setCustomExchangeRate] = useState(DEFAULT_EXCHANGE_RATE.toString());
   const [customGoldPrice, setCustomGoldPrice] = useState(DEFAULT_GOLD_PRICE.toString());
   const [handlingFee, setHandlingFee] = useState('0');
@@ -60,6 +61,10 @@ const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose, onSave }
   // Keyboard State
   const [activeField, setActiveField] = useState<NumericField | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // API State
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Refs for auto-scrolling
   const formContainerRef = useRef<HTMLDivElement>(null);
@@ -78,11 +83,17 @@ const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose, onSave }
     setAmount('');
     setUsdAmount('');
     setWeight('');
-    setCustomExchangeRate(DEFAULT_EXCHANGE_RATE.toString());
-    setCustomGoldPrice(DEFAULT_GOLD_PRICE.toString());
+    setCustomGoldPrice(currentGoldPrice.toString());
     setHandlingFee('0');
     setActiveField(null);
   };
+
+  // Update customGoldPrice when currentGoldPrice changes (if gold type is selected)
+  useEffect(() => {
+    if (selectedType === 'gold') {
+      setCustomGoldPrice(currentGoldPrice.toString());
+    }
+  }, [currentGoldPrice, selectedType]);
 
   useEffect(() => {
     if (isOpen) {
@@ -90,6 +101,43 @@ const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose, onSave }
       setIsIncrease(true);
       setSelectedType('rmb');
       resetFormValues();
+    }
+  }, [isOpen]);
+
+  // Fetch current gold price and exchange rate when modal opens
+  useEffect(() => {
+    const fetchMarketData = async () => {
+      try {
+        const response = await fetch('/api/market-data/history?days=7');
+        const result = await response.json();
+
+        if (result.success && result.data) {
+          if (result.data.gold_price) {
+            const goldPrices = result.data.gold_price;
+            const dates = Object.keys(goldPrices).sort().reverse();
+            if (dates.length > 0) {
+              const latestPrice = goldPrices[dates[0]];
+              setCurrentGoldPrice(latestPrice);
+              setCustomGoldPrice(latestPrice.toString());
+            }
+          }
+
+          if (result.data.exchange_rate) {
+            const exchangeRates = result.data.exchange_rate;
+            const dates = Object.keys(exchangeRates).sort().reverse();
+            if (dates.length > 0) {
+              const latestRate = exchangeRates[dates[0]];
+              setCustomExchangeRate(latestRate.toString());
+            }
+          }
+        }
+      } catch (error) {
+        console.error('获取市场数据失败:', error);
+      }
+    };
+
+    if (isOpen) {
+      fetchMarketData();
     }
   }, [isOpen]);
 
@@ -311,8 +359,8 @@ const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose, onSave }
 
   if (!isOpen) return null;
 
-  const handleSave = () => {
-    if (!name) return; // Simple validation
+  const handleSave = async () => {
+    if (!name) return;
 
     let finalRmbValue = 0;
     let details: {
@@ -328,15 +376,89 @@ const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose, onSave }
     } else if (selectedType === 'usd') {
       const usd = parseFloat(usdAmount) || 0;
       const rate = parseFloat(customExchangeRate) || DEFAULT_EXCHANGE_RATE;
+
+      if (usd <= 0) {
+        setErrorMessage('美元金额必须大于 0');
+        return;
+      }
+
       finalRmbValue = usd * rate;
       details = { usdAmount: usd, exchangeRate: rate };
+
+      setIsSaving(true);
+      setErrorMessage('');
+
+      try {
+        const response = await fetch('/api/usd-purchases', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            purchase_date: date,
+            usd_amount: usd,
+            exchange_rate: rate,
+            purchase_channel: name,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!result.success) {
+          setErrorMessage(result.message || '保存失败，请重试');
+          setIsSaving(false);
+          return;
+        }
+      } catch (error) {
+        console.error('保存美元购汇记录失败:', error);
+        setErrorMessage('网络错误，请重试');
+        setIsSaving(false);
+        return;
+      }
     } else if (selectedType === 'gold') {
       const g = parseFloat(weight) || 0;
-      const price = parseFloat(customGoldPrice) || DEFAULT_GOLD_PRICE;
+      const price = parseFloat(customGoldPrice) || currentGoldPrice;
       const fee = parseFloat(handlingFee) || 0;
       
+      if (g <= 0) {
+        setErrorMessage('重量必须大于 0');
+        return;
+      }
+
       finalRmbValue = g * (price + fee);
       details = { weight: g, goldPrice: price, handlingFee: fee };
+
+      setIsSaving(true);
+      setErrorMessage('');
+      
+      try {
+        const response = await fetch('/api/gold-purchases', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            purchase_date: date,
+            weight: g,
+            gold_price_per_gram: price,
+            handling_fee_per_gram: fee,
+            purchase_channel: name,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!result.success) {
+          setErrorMessage(result.message || '保存失败，请重试');
+          setIsSaving(false);
+          return;
+        }
+      } catch (error) {
+        console.error('保存黄金记录失败:', error);
+        setErrorMessage('网络错误，请重试');
+        setIsSaving(false);
+        return;
+      }
     }
 
     const newAsset = createAssetObject(
@@ -349,6 +471,7 @@ const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose, onSave }
     );
 
     onSave(newAsset);
+    setIsSaving(false);
     onClose();
   };
 
@@ -610,7 +733,7 @@ const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose, onSave }
                       value={customGoldPrice}
                       onClick={() => handleFieldClick('customGoldPrice')}
                       className={getInputClass('customGoldPrice')}
-                      placeholder={DEFAULT_GOLD_PRICE.toString()}
+                      placeholder={currentGoldPrice.toString()}
                     />
                   </div>
                   <div ref={(el) => { fieldRefs.current['handlingFee'] = el; }} className="flex-1">
@@ -630,7 +753,7 @@ const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose, onSave }
                 <div className="flex justify-between items-center px-2 pt-1">
                   <span className="text-xs text-slate-400">折合人民币 (含手续费)</span>
                   <span className="text-sm font-bold text-primary">
-                    ≈ ¥ {formatNumber((parseFloat(weight) || 0) * ((parseFloat(customGoldPrice) || DEFAULT_GOLD_PRICE) + (parseFloat(handlingFee) || 0)))}
+                    ≈ ¥ {formatNumber((parseFloat(weight) || 0) * ((parseFloat(customGoldPrice) || currentGoldPrice) + (parseFloat(handlingFee) || 0)))}
                   </span>
                 </div>
               </>
@@ -638,12 +761,35 @@ const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose, onSave }
           </div>
 
           {!activeField && (
-            <button
-              onClick={handleSave}
-              className="w-full bg-primary hover:bg-primary-dim text-white font-bold py-4 rounded-xl shadow-lg shadow-primary/30 active:scale-[0.98] transition-all"
-            >
-              确认添加
-            </button>
+            <>
+              {errorMessage && (
+                <div className="mb-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+                  <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>
+                </div>
+              )}
+              
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className={`w-full font-bold py-4 rounded-xl shadow-lg shadow-primary/30 active:scale-[0.98] transition-all ${
+                  isSaving
+                    ? 'bg-primary/50 cursor-not-allowed'
+                    : 'bg-primary hover:bg-primary-dim text-white'
+                }`}
+              >
+                {isSaving ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    保存中...
+                  </span>
+                ) : (
+                  '确认添加'
+                )}
+              </button>
+            </>
           )}
           
           <div className="h-6 sm:h-0"></div> {/* Safe area spacer for mobile */}

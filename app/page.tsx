@@ -9,19 +9,21 @@ import BottomNav from '@/components/BottomNav';
 import AddAssetModal from '@/components/AddAssetModal';
 import ProfilePage from '@/components/ProfilePage';
 import GoldDetailPage from '@/components/GoldDetailPage';
+import UsdDetailPage from '@/components/UsdDetailPage';
 import AuthGuard from '@/components/AuthGuard';
 import { Asset } from '@/types';
 import { createAssetObject } from '@/utils';
 import type { MarketDataHistoryResponse } from '@/lib/api-response';
 
 type CurrentTab = 'assets' | 'profile';
-type AssetView = 'list' | 'gold-detail';
+type AssetView = 'list' | 'gold-detail' | 'usd-detail';
 
 function Dashboard() {
   const { user } = useAuth();
   const [currentTab, setCurrentTab] = useState<CurrentTab>('assets');
   const [assetView, setAssetView] = useState<AssetView>('list');
   const [selectedGoldAsset, setSelectedGoldAsset] = useState<Asset | null>(null);
+  const [selectedUsdAsset, setSelectedUsdAsset] = useState<Asset | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -134,19 +136,24 @@ function Dashboard() {
   };
 
   const handleAssetClick = (asset: Asset) => {
-    // 只有黄金资产才显示详情页
     if (asset.type === 'gold') {
       setSelectedGoldAsset(asset);
+      setSelectedUsdAsset(null);
       setAssetView('gold-detail');
-      requestAnimationFrame(() => {
-        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-      });
+    } else if (asset.type === 'usd') {
+      setSelectedUsdAsset(asset);
+      setSelectedGoldAsset(null);
+      setAssetView('usd-detail');
     }
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    });
   };
 
   const handleBackToList = () => {
     setAssetView('list');
     setSelectedGoldAsset(null);
+    setSelectedUsdAsset(null);
     requestAnimationFrame(() => {
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     });
@@ -166,12 +173,14 @@ function Dashboard() {
           {currentTab === 'assets' ? (
             assetView === 'gold-detail' && selectedGoldAsset ? (
               <GoldDetailPage asset={selectedGoldAsset} marketData={marketData} />
+            ) : assetView === 'usd-detail' && selectedUsdAsset ? (
+              <UsdDetailPage asset={selectedUsdAsset} marketData={marketData} />
             ) : (
               <>
                 <AssetOverview assets={assets} />
-                <AssetList 
-                  assets={assets} 
-                  marketData={marketData} 
+                <AssetList
+                  assets={assets}
+                  marketData={marketData}
                   isLoading={isMarketDataLoading}
                   onAssetClick={handleAssetClick}
                 />
