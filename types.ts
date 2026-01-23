@@ -177,3 +177,20 @@ export interface UserProfile {
 }
 
 export type CurrentTab = 'assets' | 'profile';
+
+// ============================================================
+// 资产组合聚合类型定义
+// ============================================================
+
+export interface PortfolioRpcResult {
+  record_type: 'gold-purchases' | 'usd-purchases' | 'rmb-deposits' | 'debt-records';
+  record_id: string;
+  record_data: GoldPurchaseRecord | UsdPurchaseRecord | RmbDepositRecord | DebtRecord;
+}
+
+export interface PortfolioAllResponse {
+  'gold-purchases': Record<string, GoldPurchaseRecord>;
+  'debt-records': Record<string, DebtRecord>;
+  'usd-purchases': Record<string, UsdPurchaseRecord>;
+  'rmb-deposits': Record<string, RmbDepositRecord>;
+}

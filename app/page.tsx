@@ -13,15 +13,16 @@ import UsdDetailPage from '@/components/UsdDetailPage';
 import RmbDetailPage from '@/components/RmbDetailPage';
 import DebtDetailPage from '@/components/DebtDetailPage';
 import AuthGuard from '@/components/AuthGuard';
-import { Asset } from '@/types';
-import { createAssetObject } from '@/utils';
+import { Asset, PortfolioAllResponse } from '@/types';
+import { createAssetObject, getLatestValue } from '@/utils';
+import { fetchPortfolioAll } from '@/lib/api/portfolio';
 import type { MarketDataHistoryResponse } from '@/lib/api-response';
 
 type CurrentTab = 'assets' | 'profile';
 type AssetView = 'list' | 'gold-detail' | 'usd-detail' | 'rmb-detail' | 'debt-detail';
 
 function Dashboard() {
-  const { user } = useAuth();
+  const { } = useAuth();
   const [currentTab, setCurrentTab] = useState<CurrentTab>('assets');
   const [assetView, setAssetView] = useState<AssetView>('list');
   const [selectedGoldAsset, setSelectedGoldAsset] = useState<Asset | null>(null);
@@ -30,49 +31,93 @@ function Dashboard() {
   const [selectedDebtAsset, setSelectedDebtAsset] = useState<Asset | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
   const [marketData, setMarketData] = useState<MarketDataHistoryResponse | null>(null);
   const [isMarketDataLoading, setIsMarketDataLoading] = useState(false);
+  const [portfolio, setPortfolio] = useState<PortfolioAllResponse | null>(null);
+  const [isPortfolioLoading, setIsPortfolioLoading] = useState(true);
 
-  const STORAGE_KEY = user?.email 
-    ? `private_client_assets_${user.email}` 
-    : 'private_client_assets';
-
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
+  const calculateAssets = (
+    portfolioData: PortfolioAllResponse,
+    goldPrice: number,
+    exchangeRate: number
+  ): Asset[] => {
     const today = new Date().toISOString().split('T')[0];
-    
-    const defaultAssets: Asset[] = [
-       createAssetObject('rmb', '人民币存款', 5000000, true, {}, today, 'default-rmb'),
-       createAssetObject('usd', '美元资产', 3550000, true, { usdAmount: 500000, exchangeRate: 7.1 }, today, 'default-usd'),
-       createAssetObject('gold', '实物黄金', 2400000, true, { weight: 5000, goldPrice: 480 }, today, 'default-gold'),
-       createAssetObject('debt', '债权资产', 1500000, true, {}, today, 'default-debt'),
+    const goldRecords = Object.values(portfolioData['gold-purchases']);
+    const totalWeight = goldRecords.reduce((sum, r) => sum + r.weight, 0);
+    const goldAmount = totalWeight * goldPrice;
+
+    const usdRecords = Object.values(portfolioData['usd-purchases']);
+    const totalUsd = usdRecords.reduce((sum, r) => sum + r.usd_amount, 0);
+    const usdAmount = totalUsd * exchangeRate;
+
+    const rmbRecords = Object.values(portfolioData['rmb-deposits']);
+    const rmbAmount = rmbRecords.reduce((sum, r) => sum + r.amount, 0);
+
+    const debtRecords = Object.values(portfolioData['debt-records']);
+    const debtAmount = debtRecords.reduce((sum, r) => sum + r.amount, 0);
+
+    return [
+      createAssetObject('rmb', '人民币存款', rmbAmount, true, {}, today, 'portfolio-rmb'),
+      createAssetObject('usd', '美元资产', usdAmount, true, { usdAmount: totalUsd, exchangeRate }, today, 'portfolio-usd'),
+      createAssetObject('gold', '实物黄金', goldAmount, true, { weight: totalWeight, goldPrice }, today, 'portfolio-gold'),
+      createAssetObject('debt', '债权资产', debtAmount, true, {}, today, 'portfolio-debt'),
     ];
-    defaultAssets[0].subtitle = '4个账户正在监测';
-    defaultAssets[3].subtitle = '3笔进行中借款';
-    
-    const loadedAssets = saved ? JSON.parse(saved) : defaultAssets;
-    
-    const idMap = new Map<string, number>();
-    const uniqueAssets = loadedAssets.map((asset: Asset) => {
-      const count = idMap.get(asset.id) || 0;
-      idMap.set(asset.id, count + 1);
-      
-      if (count > 0) {
-        return { ...asset, id: `${asset.id}-dup-${count}` };
-      }
-      return asset;
-    });
-    
-    setAssets(uniqueAssets);
-    setIsLoaded(true);
-  }, [STORAGE_KEY]);
+  };
 
   useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(assets));
+    const controller = new AbortController();
+
+    const fetchPortfolioData = async () => {
+      try {
+        const data = await fetchPortfolioAll(controller.signal);
+        if (!controller.signal.aborted) {
+          setPortfolio(data);
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') return;
+        
+        console.error('获取资产组合数据失败:', error);
+        if (!controller.signal.aborted) {
+          setPortfolio({
+            'gold-purchases': {},
+            'debt-records': {},
+            'usd-purchases': {},
+            'rmb-deposits': {},
+          });
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsPortfolioLoading(false);
+        }
+      }
+    };
+
+    // Debounce to fetch to avoid double-calling in Strict Mode
+    const timeoutId = setTimeout(() => {
+      fetchPortfolioData();
+    }, 50);
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (portfolio && marketData) {
+      const goldPrice = getLatestValue(marketData.gold_price) || 500;
+      const exchangeRate = getLatestValue(marketData.exchange_rate) || 7.2;
+
+      const calculatedAssets = calculateAssets(portfolio, goldPrice, exchangeRate);
+      setAssets(calculatedAssets);
+    } else if (portfolio && isPortfolioLoading === false) {
+      const goldPrice = 500;
+      const exchangeRate = 7.2;
+
+      const calculatedAssets = calculateAssets(portfolio, goldPrice, exchangeRate);
+      setAssets(calculatedAssets);
     }
-  }, [assets, isLoaded, STORAGE_KEY]);
+  }, [portfolio, marketData, isPortfolioLoading]);
 
   useEffect(() => {
     const controller = new AbortController();
