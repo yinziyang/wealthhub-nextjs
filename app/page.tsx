@@ -21,6 +21,17 @@ import type { MarketDataHistoryResponse } from '@/lib/api-response';
 type CurrentTab = 'assets' | 'profile';
 type AssetView = 'list' | 'gold-detail' | 'usd-detail' | 'rmb-detail' | 'debt-detail';
 
+// 默认占位资产对象，用于初始渲染和 loading 状态
+const createDefaultAssets = (): Asset[] => {
+  const today = new Date().toISOString().split('T')[0];
+  return [
+    createAssetObject('rmb', '人民币存款', 0, true, {}, today, 'portfolio-rmb'),
+    createAssetObject('usd', '美元资产', 0, true, { usdAmount: 0, exchangeRate: 0 }, today, 'portfolio-usd'),
+    createAssetObject('gold', '实物黄金', 0, true, { weight: 0, goldPrice: 0 }, today, 'portfolio-gold'),
+    createAssetObject('debt', '债权资产', 0, true, {}, today, 'portfolio-debt'),
+  ];
+};
+
 function Dashboard() {
   const { } = useAuth();
   const [currentTab, setCurrentTab] = useState<CurrentTab>('assets');
@@ -30,7 +41,9 @@ function Dashboard() {
   const [selectedRmbAsset, setSelectedRmbAsset] = useState<Asset | null>(null);
   const [selectedDebtAsset, setSelectedDebtAsset] = useState<Asset | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [assets, setAssets] = useState<Asset[]>([]);
+  
+  // 初始化为默认占位资产
+  const [assets, setAssets] = useState<Asset[]>(createDefaultAssets());
   const [marketData, setMarketData] = useState<MarketDataHistoryResponse | null>(null);
   const [isMarketDataLoading, setIsMarketDataLoading] = useState(false);
   const [portfolio, setPortfolio] = useState<PortfolioAllResponse | null>(null);
@@ -68,6 +81,9 @@ function Dashboard() {
     const controller = new AbortController();
 
     const fetchPortfolioData = async () => {
+      // 开始加载前，重置为 loading 状态
+      setIsPortfolioLoading(true);
+      
       try {
         const data = await fetchPortfolioAll(controller.signal);
         if (!controller.signal.aborted) {
@@ -252,7 +268,7 @@ function Dashboard() {
                 <AssetList
                   assets={assets}
                   marketData={marketData}
-                  isLoading={isMarketDataLoading}
+                  isLoading={isPortfolioLoading}
                   onAssetClick={handleAssetClick}
                 />
               </>
