@@ -10,13 +10,15 @@ import AddAssetModal from '@/components/AddAssetModal';
 import ProfilePage from '@/components/ProfilePage';
 import GoldDetailPage from '@/components/GoldDetailPage';
 import UsdDetailPage from '@/components/UsdDetailPage';
+import RmbDetailPage from '@/components/RmbDetailPage';
+import DebtDetailPage from '@/components/DebtDetailPage';
 import AuthGuard from '@/components/AuthGuard';
 import { Asset } from '@/types';
 import { createAssetObject } from '@/utils';
 import type { MarketDataHistoryResponse } from '@/lib/api-response';
 
 type CurrentTab = 'assets' | 'profile';
-type AssetView = 'list' | 'gold-detail' | 'usd-detail';
+type AssetView = 'list' | 'gold-detail' | 'usd-detail' | 'rmb-detail' | 'debt-detail';
 
 function Dashboard() {
   const { user } = useAuth();
@@ -24,6 +26,8 @@ function Dashboard() {
   const [assetView, setAssetView] = useState<AssetView>('list');
   const [selectedGoldAsset, setSelectedGoldAsset] = useState<Asset | null>(null);
   const [selectedUsdAsset, setSelectedUsdAsset] = useState<Asset | null>(null);
+  const [selectedRmbAsset, setSelectedRmbAsset] = useState<Asset | null>(null);
+  const [selectedDebtAsset, setSelectedDebtAsset] = useState<Asset | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -139,11 +143,27 @@ function Dashboard() {
     if (asset.type === 'gold') {
       setSelectedGoldAsset(asset);
       setSelectedUsdAsset(null);
+      setSelectedRmbAsset(null);
+      setSelectedDebtAsset(null);
       setAssetView('gold-detail');
     } else if (asset.type === 'usd') {
       setSelectedUsdAsset(asset);
       setSelectedGoldAsset(null);
+      setSelectedRmbAsset(null);
+      setSelectedDebtAsset(null);
       setAssetView('usd-detail');
+    } else if (asset.type === 'rmb') {
+      setSelectedRmbAsset(asset);
+      setSelectedGoldAsset(null);
+      setSelectedUsdAsset(null);
+      setSelectedDebtAsset(null);
+      setAssetView('rmb-detail');
+    } else if (asset.type === 'debt') {
+      setSelectedDebtAsset(asset);
+      setSelectedGoldAsset(null);
+      setSelectedUsdAsset(null);
+      setSelectedRmbAsset(null);
+      setAssetView('debt-detail');
     }
     requestAnimationFrame(() => {
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
@@ -154,6 +174,8 @@ function Dashboard() {
     setAssetView('list');
     setSelectedGoldAsset(null);
     setSelectedUsdAsset(null);
+    setSelectedRmbAsset(null);
+    setSelectedDebtAsset(null);
     requestAnimationFrame(() => {
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     });
@@ -175,6 +197,10 @@ function Dashboard() {
               <GoldDetailPage asset={selectedGoldAsset} marketData={marketData} />
             ) : assetView === 'usd-detail' && selectedUsdAsset ? (
               <UsdDetailPage asset={selectedUsdAsset} marketData={marketData} />
+            ) : assetView === 'rmb-detail' && selectedRmbAsset ? (
+              <RmbDetailPage asset={selectedRmbAsset} />
+            ) : assetView === 'debt-detail' && selectedDebtAsset ? (
+              <DebtDetailPage asset={selectedDebtAsset} />
             ) : (
               <>
                 <AssetOverview assets={assets} />

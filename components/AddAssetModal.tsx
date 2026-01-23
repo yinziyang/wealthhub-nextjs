@@ -371,8 +371,84 @@ const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose, onSave }
       handlingFee?: number;
     } = {};
 
-    if (selectedType === 'rmb' || selectedType === 'debt') {
-      finalRmbValue = parseFloat(amount) || 0;
+    if (selectedType === 'rmb') {
+      const rmbAmount = parseFloat(amount) || 0;
+
+      if (rmbAmount <= 0) {
+        setErrorMessage('金额必须大于 0');
+        return;
+      }
+
+      finalRmbValue = rmbAmount;
+
+      setIsSaving(true);
+      setErrorMessage('');
+
+      try {
+        const response = await fetch('/api/rmb-deposits', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            deposit_date: date,
+            bank_name: name,
+            amount: rmbAmount,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!result.success) {
+          setErrorMessage(result.message || '保存失败，请重试');
+          setIsSaving(false);
+          return;
+        }
+      } catch (error) {
+        console.error('保存人民币存款记录失败:', error);
+        setErrorMessage('网络错误，请重试');
+        setIsSaving(false);
+        return;
+      }
+    } else if (selectedType === 'debt') {
+      const debtAmount = parseFloat(amount) || 0;
+
+      if (debtAmount <= 0) {
+        setErrorMessage('金额必须大于 0');
+        return;
+      }
+
+      finalRmbValue = debtAmount;
+
+      setIsSaving(true);
+      setErrorMessage('');
+
+      try {
+        const response = await fetch('/api/debt-records', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            loan_date: date,
+            debtor_name: name,
+            amount: debtAmount,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!result.success) {
+          setErrorMessage(result.message || '保存失败，请重试');
+          setIsSaving(false);
+          return;
+        }
+      } catch (error) {
+        console.error('保存债权记录失败:', error);
+        setErrorMessage('网络错误，请重试');
+        setIsSaving(false);
+        return;
+      }
     } else if (selectedType === 'usd') {
       const usd = parseFloat(usdAmount) || 0;
       const rate = parseFloat(customExchangeRate) || DEFAULT_EXCHANGE_RATE;

@@ -75,6 +75,71 @@ export interface UpdateUsdPurchaseRequest {
   purchase_channel?: string;       // 购汇渠道（可选）
 }
 
+// ============================================================
+// 人民币存款记录类型定义
+// ============================================================
+
+// 数据库记录类型（与数据库字段一一对应）
+export interface RmbDepositRecord {
+  id: string;
+  user_id: string;
+  deposit_date: string;           // ISO 8601 格式的时间戳
+  bank_name: string;              // 存款银行名称
+  amount: number;                 // 存款金额
+  created_at: string;
+  updated_at: string;
+}
+
+// 创建记录的请求参数
+export interface CreateRmbDepositRequest {
+  deposit_date: string;
+  bank_name: string;
+  amount: number;
+}
+
+// 更新记录的请求参数（所有字段可选）
+export interface UpdateRmbDepositRequest {
+  deposit_date?: string;
+  bank_name?: string;
+  amount?: number;
+}
+
+// ============================================================
+// 债权资产记录类型定义
+// ============================================================
+
+// 数据库记录类型（与数据库字段一一对应）
+export interface DebtRecord {
+  id: string;
+  user_id: string;
+  loan_date: string;              // ISO 8601 格式的时间戳
+  debtor_name: string;            // 借款人姓名
+  amount: number;                 // 借款额度
+  created_at: string;
+  updated_at: string;
+}
+
+// 创建记录的请求参数
+export interface CreateDebtRecordRequest {
+  loan_date: string;
+  debtor_name: string;
+  amount: number;
+}
+
+// 更新记录的请求参数（所有字段可选）
+export interface UpdateDebtRecordRequest {
+  loan_date?: string;
+  debtor_name?: string;
+  amount?: number;
+}
+
+// 折线图数据项
+export interface RmbDepositChartItem {
+  date: string;        // YYYYMMDD 格式，北京时间
+  bank_name: string;   // 银行名称（合并时用逗号分隔）
+  amount: number;      // 当日存款金额
+}
+
 export interface Asset {
   id: string;
   type: 'rmb' | 'usd' | 'gold' | 'debt';
@@ -89,8 +154,8 @@ export interface Asset {
   iconColor: string;
   chart: ChartConfig;
   date?: string;
-  // 购买记录（根据 type 字段区分类型，详情页内部独立获取，此字段预留扩展）
-  purchaseRecords?: GoldPurchaseRecord[] | UsdPurchaseRecord[];
+  // 购买/存款/债权记录（根据 type 字段区分类型，详情页内部独立获取）
+  purchaseRecords?: GoldPurchaseRecord[] | UsdPurchaseRecord[] | RmbDepositRecord[] | DebtRecord[];
 }
 
 export interface DistributionItem {

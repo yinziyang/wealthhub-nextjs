@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface HeaderProps {
   currentTab: 'assets' | 'profile';
-  assetView?: 'list' | 'gold-detail' | 'usd-detail';
+  assetView?: 'list' | 'gold-detail' | 'usd-detail' | 'rmb-detail' | 'debt-detail';
   onBack?: () => void;
 }
 
@@ -18,6 +18,8 @@ const Header: React.FC<HeaderProps> = ({ currentTab, assetView = 'list', onBack 
 
   const isGoldDetail = currentTab === 'assets' && assetView === 'gold-detail';
   const isUsdDetail = currentTab === 'assets' && assetView === 'usd-detail';
+  const isRmbDetail = currentTab === 'assets' && assetView === 'rmb-detail';
+  const isDebtDetail = currentTab === 'assets' && assetView === 'debt-detail';
 
   return (
     <header
@@ -63,9 +65,43 @@ const Header: React.FC<HeaderProps> = ({ currentTab, assetView = 'list', onBack 
                 <h1 className="text-slate-900 dark:text-white text-lg font-bold leading-tight">
                   美元资产
                 </h1>
-              </div>
-            </>
-          ) : currentTab === 'assets' ? (
+               </div>
+             </>
+           ) : isRmbDetail ? (
+             <>
+               <button
+                 onClick={onBack}
+                 className="flex items-center justify-center size-9 rounded-full bg-slate-100 dark:bg-surface-dark text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-surface-darker transition-colors outline-none focus:outline-none"
+               >
+                 <ArrowLeft size={20} />
+               </button>
+               <div>
+                 <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium tracking-wider uppercase">
+                   Private Client
+                 </p>
+                  <h1 className="text-slate-900 dark:text-white text-lg font-bold leading-tight">
+                    人民币存款
+                  </h1>
+                </div>
+              </>
+            ) : isDebtDetail ? (
+              <>
+                <button
+                  onClick={onBack}
+                  className="flex items-center justify-center size-9 rounded-full bg-slate-100 dark:bg-surface-dark text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-surface-darker transition-colors outline-none focus:outline-none"
+                >
+                  <ArrowLeft size={20} />
+                </button>
+                <div>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium tracking-wider uppercase">
+                    Private Client
+                  </p>
+                  <h1 className="text-slate-900 dark:text-white text-lg font-bold leading-tight">
+                    债权资产
+                  </h1>
+                </div>
+              </>
+            ) : currentTab === 'assets' ? (
             <>
               <div className="relative size-10 shrink-0 rounded-full bg-primary/20 flex items-center justify-center">
                 <span className="text-primary font-bold">
@@ -92,7 +128,7 @@ const Header: React.FC<HeaderProps> = ({ currentTab, assetView = 'list', onBack 
             </div>
           )}
         </div>
-        {currentTab === 'assets' && !isGoldDetail && !isUsdDetail && (
+        {currentTab === 'assets' && !isGoldDetail && !isUsdDetail && !isRmbDetail && (
           <div className="flex items-center gap-2">
             <button className="flex items-center justify-center size-9 rounded-full bg-slate-100 dark:bg-surface-dark text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-surface-darker transition-colors">
               <Bell size={20} />
