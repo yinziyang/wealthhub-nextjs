@@ -80,11 +80,17 @@ const GoldDetailPage: React.FC<GoldDetailPageProps> = ({
 
   // 从 marketData 获取当前金价，如果没有则从 asset.subAmount 提取（例如："¥480 /g"）
   let currentPrice = 0;
+  let todayChangePercent = 0;
   if (marketData?.gold_price) {
     const entries = Object.entries(marketData.gold_price);
     if (entries.length > 0) {
       const sorted = entries.sort(([a], [b]) => parseInt(b) - parseInt(a));
       currentPrice = sorted[0][1] || 0;
+      if (sorted.length > 1) {
+        const todayPrice = sorted[0][1];
+        const yesterdayPrice = sorted[1][1];
+        todayChangePercent = ((todayPrice - yesterdayPrice) / yesterdayPrice) * 100;
+      }
     }
   }
   if (currentPrice === 0) {
@@ -113,9 +119,6 @@ const GoldDetailPage: React.FC<GoldDetailPageProps> = ({
   // 累计持有盈亏 = 当前总市值 - 总投资成本
   const profitLoss = currentMarketValue - totalInvestment;
 
-  // 计算今日涨跌幅（暂时设为0%，后续可以从市场数据计算）
-  const todayChangePercent = 0;
-
   return (
     <div className="space-y-4 -mt-2">
       {/* 上半部分：价格和盈亏信息 */}
@@ -143,7 +146,7 @@ const GoldDetailPage: React.FC<GoldDetailPageProps> = ({
                 }`}
               >
                 {todayChangePercent >= 0 ? "+" : ""}
-                {todayChangePercent}% 今日
+                {formatNumber(todayChangePercent, 2)}% 今日
               </div>
             </div>
           </div>
@@ -214,6 +217,8 @@ const GoldDetailPage: React.FC<GoldDetailPageProps> = ({
         asset={asset}
         currentGoldPrice={currentPrice}
         marketData={marketData}
+        records={purchaseRecords}
+        loading={loading}
       />
     </div>
   );

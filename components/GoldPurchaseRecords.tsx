@@ -1,15 +1,16 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { Asset, GoldPurchaseRecord } from '@/types';
 import { formatNumber } from '@/utils';
-import { getGoldPurchases } from '@/lib/api/gold-purchases';
 import { MarketDataHistoryResponse } from '@/lib/api-response';
 
 interface GoldPurchaseRecordsProps {
   asset: Asset;
   currentGoldPrice: number;
   marketData?: MarketDataHistoryResponse | null;
+  records: GoldPurchaseRecord[];
+  loading: boolean;
 }
 
 interface RecordWithProfit extends GoldPurchaseRecord {
@@ -18,72 +19,11 @@ interface RecordWithProfit extends GoldPurchaseRecord {
   purchaseCost: number;
 }
 
-// 模块级别的请求缓存，防止 React Strict Mode 导致重复请求
-let globalFetchPromiseGold: Promise<GoldPurchaseRecord[]> | null = null;
-
 const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
   currentGoldPrice,
+  records,
+  loading,
 }) => {
-  const [records, setRecords] = useState<GoldPurchaseRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // 统一获取数据，只调用一次 API（使用模块级缓存防止 React Strict Mode 导致重复请求）
-  useEffect(() => {
-    let isCancelled = false;
-
-    async function fetchRecords() {
-      // 如果已经有正在进行的全局请求，复用它
-      if (globalFetchPromiseGold) {
-        try {
-          const data = await globalFetchPromiseGold;
-          if (!isCancelled) {
-            setRecords(data);
-            setLoading(false);
-          }
-        } catch (err) {
-          if (!isCancelled) {
-            console.error('获取黄金买入记录失败:', err);
-            setError(err instanceof Error ? err.message : '获取数据失败');
-            setLoading(false);
-          }
-        }
-        return;
-      }
-
-      // 创建新的请求并缓存到全局变量
-      setLoading(true);
-      setError(null);
-      globalFetchPromiseGold = getGoldPurchases();
-
-      try {
-        const data = await globalFetchPromiseGold;
-        
-        // 如果组件已卸载或请求被取消，不更新状态
-        if (!isCancelled) {
-          setRecords(data);
-        }
-      } catch (err) {
-        if (!isCancelled) {
-          console.error('获取黄金买入记录失败:', err);
-          setError(err instanceof Error ? err.message : '获取数据失败');
-        }
-      } finally {
-        if (!isCancelled) {
-          setLoading(false);
-        }
-        // 请求完成后立即清除全局缓存
-        globalFetchPromiseGold = null;
-      }
-    }
-
-    fetchRecords();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, []);
-
   const recordsWithProfit = useMemo<RecordWithProfit[]>(() => {
     return records.map(record => {
       const currentValue = record.weight * currentGoldPrice;
@@ -115,19 +55,6 @@ const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
         </div>
         <div className="text-center py-8 text-slate-500 dark:text-slate-400">
           加载中...
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="space-y-3">
-        <div className="text-slate-900 dark:text-white text-base font-bold px-1">
-          购买记录
-        </div>
-        <div className="text-center py-8 text-red-500">
-          {error}
         </div>
       </div>
     );
