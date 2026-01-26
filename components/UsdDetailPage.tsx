@@ -1,152 +1,127 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { Asset, UsdPurchaseRecord } from '@/types';
-import { formatNumber } from '@/utils';
-import type { MarketDataHistoryResponse } from '@/lib/api-response';
-import { getUsdPurchases } from '@/lib/api/usd-purchases';
-import UsdExchangeRateChart from '@/components/UsdExchangeRateChart';
-import UsdPurchaseRecords from '@/components/UsdPurchaseRecords';
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { Asset, UsdPurchaseRecord } from "@/types";
+import { formatNumber } from "@/utils";
+import type { MarketDataHistoryResponse } from "@/lib/api-response";
+import UsdExchangeRateChart from "@/components/UsdExchangeRateChart";
+import UsdPurchaseRecords from "@/components/UsdPurchaseRecords";
 
 interface UsdDetailPageProps {
   asset: Asset;
-  marketData?: MarketDataHistoryResponse | null;
 }
 
-// 模块级别的请求缓存，防止 React Strict Mode 导致重复请求
-let globalFetchPromiseUsd: Promise<UsdPurchaseRecord[]> | null = null;
-
-// asset 参数保留以保持接口兼容性，但数据从接口获取
-const UsdDetailPage: React.FC<UsdDetailPageProps> = ({ asset: _asset, marketData }) => {
+const UsdDetailPage: React.FC<UsdDetailPageProps> = ({
+  asset: _asset,
+}) => {
+  const [data30d, setData30d] = useState<MarketDataHistoryResponse | null>(null);
   const [purchaseRecords, setPurchaseRecords] = useState<UsdPurchaseRecord[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // 获取购买记录
-  const fetchRecords = useCallback(async () => {
-    // 如果已经有正在进行的全局请求，复用它
-    if (globalFetchPromiseUsd) {
-      try {
-        const data = await globalFetchPromiseUsd;
-        setPurchaseRecords(data);
-        setLoading(false);
-      } catch (err) {
-        console.error('获取美元购汇记录失败:', err);
-        setLoading(false);
-      }
-      return;
-    }
-
-    // 创建新的请求并缓存到全局变量
-    setLoading(true);
-    globalFetchPromiseUsd = getUsdPurchases();
-
-    try {
-      const data = await globalFetchPromiseUsd;
-      setPurchaseRecords(data);
-    } catch (err) {
-      console.error('获取美元购汇记录失败:', err);
-    } finally {
-      setLoading(false);
-      // 请求完成后立即清除全局缓存
-      globalFetchPromiseUsd = null;
-    }
-  }, []);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let isCancelled = false;
+    const controller = new AbortController();
 
-    async function fetchData() {
-      // 如果已经有正在进行的全局请求，复用它
-      if (globalFetchPromiseUsd) {
-        try {
-          const data = await globalFetchPromiseUsd;
-          if (!isCancelled) {
-            setPurchaseRecords(data);
-            setLoading(false);
-          }
-        } catch (err) {
-          if (!isCancelled) {
-            console.error('获取美元购汇记录失败:', err);
-            setLoading(false);
-          }
-        }
-        return;
-      }
-
-      // 创建新的请求并缓存到全局变量
+    async function fetchAllData() {
       setLoading(true);
-      globalFetchPromiseUsd = getUsdPurchases();
+      setError(null);
 
       try {
-        const data = await globalFetchPromiseUsd;
+        const [resMarket, resRecords] = await Promise.all([
+          fetch('/api/market-data/history?days=30', { signal: controller.signal }),
+          fetch('/api/usd-purchases', { signal: controller.signal }),
+        ]);
 
-        // 如果组件已卸载或请求被取消，不更新状态
-        if (!isCancelled) {
-          setPurchaseRecords(data);
+        const [jsonMarket, jsonRecords] = await Promise.all([
+          resMarket.json(),
+          resRecords.json(),
+        ]);
+
+        if (isCancelled) return;
+
+        if (jsonMarket.success) {
+          setData30d(jsonMarket.data);
+        }
+        if (jsonRecords.success) {
+          setPurchaseRecords(jsonRecords.data);
         }
       } catch (err) {
-        if (!isCancelled) {
-          console.error('获取美元购汇记录失败:', err);
+        if (!isCancelled && err instanceof Error && err.name !== 'AbortError') {
+          console.error('获取数据失败:', err);
+          setError('数据加载失败');
         }
       } finally {
         if (!isCancelled) {
           setLoading(false);
         }
-        // 请求完成后立即清除全局缓存
-        globalFetchPromiseUsd = null;
       }
     }
 
-    fetchData();
+    fetchAllData();
 
     return () => {
       isCancelled = true;
+      controller.abort();
     };
   }, []);
 
-  // 从 marketData 获取当前汇率，如果没有则使用默认值
-  let currentExchangeRate = 7.24;
-  let todayChangePercent = 0;
-  if (marketData?.exchange_rate) {
-    const entries = Object.entries(marketData.exchange_rate);
-    if (entries.length > 0) {
-      const sorted = entries.sort(([a], [b]) => parseInt(b) - parseInt(a));
-      currentExchangeRate = sorted[0][1] || 7.24;
-      if (sorted.length > 1) {
-        const todayRate = sorted[0][1];
-        const yesterdayRate = sorted[1][1];
-        todayChangePercent = ((todayRate - yesterdayRate) / yesterdayRate) * 100;
-      }
-    }
-  }
+  // Calculate current exchange rate and change
+  const currentExchangeRate = useMemo(() => {
+    if (!data30d?.exchange_rate) return 7.24; // Default value
+    const entries = Object.entries(data30d.exchange_rate);
+    if (entries.length === 0) return 7.24;
+    const sorted = entries.sort(([a], [b]) => parseInt(b) - parseInt(a));
+    return sorted[0][1] || 7.24;
+  }, [data30d]);
 
-  // 根据购买记录计算总美元金额（usd_amount累加）
+  const todayChangePercent = useMemo(() => {
+    if (!data30d?.exchange_rate) return 0;
+    const entries = Object.entries(data30d.exchange_rate);
+    if (entries.length < 2) return 0;
+    const sorted = entries.sort(([a], [b]) => parseInt(b) - parseInt(a));
+    const todayRate = sorted[0][1];
+    const yesterdayRate = sorted[1][1];
+    if (yesterdayRate === 0) return 0;
+    return ((todayRate - yesterdayRate) / yesterdayRate) * 100;
+  }, [data30d]);
+
+  // Refresh purchase records only
+  const fetchRecords = useCallback(async () => {
+    try {
+      const res = await fetch('/api/usd-purchases');
+      const json = await res.json();
+      if (json.success) {
+        setPurchaseRecords(json.data);
+      }
+    } catch (err) {
+      console.error('刷新购汇记录失败:', err);
+    }
+  }, []);
+
+  // Calculate statistics
   const totalUsdAmount = purchaseRecords.reduce(
     (sum, record) => sum + record.usd_amount,
     0,
   );
 
-  // 总投资成本（total_rmb_amount累加）
   const totalInvestment = purchaseRecords.reduce(
     (sum, record) => sum + record.total_rmb_amount,
     0,
   );
 
-  // 持仓汇率 = 总投资成本 / 总美元金额
-  const averageExchangeRate = totalUsdAmount > 0 ? totalInvestment / totalUsdAmount : 0;
+  const averageExchangeRate =
+    totalUsdAmount > 0 ? totalInvestment / totalUsdAmount : 0;
 
-  // 当前总市值 = 总美元金额 * 当前汇率
   const currentTotalValue = totalUsdAmount * currentExchangeRate;
-
-  // 累计持有盈亏 = 当前总市值 - 总投资成本
   const profitLoss = currentTotalValue - totalInvestment;
 
   return (
     <div className="space-y-4 -mt-2">
-      <div 
+      <div
         className="rounded-2xl bg-surface-darker border border-[rgba(34,197,94,0.12)] overflow-hidden shadow-sm"
         style={{
-          borderRadius: '32px',
+          borderRadius: "32px",
         }}
       >
         <div className="px-5 pt-5 pb-4 bg-gradient-to-b from-emerald-50/30 dark:from-emerald-900/10 to-transparent">
@@ -155,17 +130,22 @@ const UsdDetailPage: React.FC<UsdDetailPageProps> = ({ asset: _asset, marketData
               {loading ? (
                 <span className="inline-block w-32 h-10 bg-emerald-200 dark:bg-emerald-800 rounded animate-pulse" />
               ) : (
-                formatNumber(currentExchangeRate, 2)
+                formatNumber(currentExchangeRate, 4)
               )}
             </div>
             <div className="flex items-center justify-between">
               <div className="text-slate-500 dark:text-slate-300 text-xs font-medium">
                 美元汇率 (USD/CNY)
               </div>
-              <div className={`text-sm font-bold ${
-                todayChangePercent >= 0 ? 'text-emerald-500 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'
-              }`}>
-                {todayChangePercent >= 0 ? '+' : ''}{formatNumber(todayChangePercent, 2)}% 今日
+              <div
+                className={`text-sm font-bold ${
+                  todayChangePercent >= 0
+                    ? "text-emerald-500 dark:text-emerald-400"
+                    : "text-red-500 dark:text-red-400"
+                }`}
+              >
+                {todayChangePercent >= 0 ? "+" : ""}
+                {formatNumber(todayChangePercent, 2)}% 今日
               </div>
             </div>
           </div>
@@ -175,7 +155,7 @@ const UsdDetailPage: React.FC<UsdDetailPageProps> = ({ asset: _asset, marketData
               {loading ? (
                 <span className="inline-block w-24 h-8 bg-emerald-200 dark:bg-emerald-800 rounded animate-pulse" />
               ) : (
-                `${profitLoss >= 0 ? '+' : ''}¥${formatNumber(profitLoss, 0)}`
+                `${profitLoss >= 0 ? "+" : ""}¥${formatNumber(profitLoss, 0)}`
               )}
             </div>
             <div className="text-slate-500 dark:text-slate-300 text-xs font-medium">
@@ -227,12 +207,18 @@ const UsdDetailPage: React.FC<UsdDetailPageProps> = ({ asset: _asset, marketData
         </div>
       </div>
 
-      <UsdExchangeRateChart />
+      {loading ? (
+        <div className="rounded-2xl bg-surface-darker border border-[rgba(34,197,94,0.12)] overflow-hidden shadow-sm p-4 h-[250px] flex items-center justify-center">
+          <div className="text-slate-500 dark:text-slate-400 text-sm animate-pulse">
+            加载图表数据...
+          </div>
+        </div>
+      ) : (
+        <UsdExchangeRateChart initialData30d={data30d} />
+      )}
 
-      <UsdPurchaseRecords 
-        asset={_asset}
+      <UsdPurchaseRecords
         currentExchangeRate={currentExchangeRate}
-        marketData={marketData}
         records={purchaseRecords}
         loading={loading}
         onRefresh={fetchRecords}

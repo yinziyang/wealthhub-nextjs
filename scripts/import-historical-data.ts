@@ -80,6 +80,7 @@ async function main() {
 
       const { error } = await client
         .from('daily_market_data')
+        // @ts-ignore
         .upsert(batch, { onConflict: 'date' });
 
       if (error) {

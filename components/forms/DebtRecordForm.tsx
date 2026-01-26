@@ -4,12 +4,26 @@ import React, { useState, useEffect } from 'react';
 import { CreateDebtRecordRequest, DebtRecord } from '@/types';
 import FormField from './FormField';
 import NumericKeyboard from '@/components/NumericKeyboard';
+import { DatePickerWheel } from '@/components/DatePickerWheel';
 
 const getTodayString = () => {
   const today = new Date();
   const yyyy = today.getFullYear();
   const mm = String(today.getMonth() + 1).padStart(2, '0');
   const dd = String(today.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const parseDateString = (dateStr: string) => {
+  if (!dateStr) return new Date();
+  const parts = dateStr.split('-').map(Number);
+  return new Date(parts[0], parts[1] - 1, parts[2]);
+};
+
+const formatDateToString = (date: Date) => {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 };
 
@@ -32,6 +46,7 @@ const DebtRecordForm: React.FC<DebtRecordFormProps> = ({
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [activeField, setActiveField] = useState<'amount' | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   useEffect(() => {
     if (mode === 'edit' && initialData) {
@@ -43,6 +58,7 @@ const DebtRecordForm: React.FC<DebtRecordFormProps> = ({
 
   const handleFieldClick = (field: 'amount') => {
     setActiveField(field);
+    setShowDatePicker(false);
   };
 
   const handleKeyboardInput = (key: string) => {
@@ -110,6 +126,10 @@ const DebtRecordForm: React.FC<DebtRecordFormProps> = ({
           value={date}
           type="numeric"
           readOnly
+          onClick={() => {
+            setShowDatePicker(true);
+            setActiveField(null);
+          }}
           className="w-[35%]"
         />
         <FormField
@@ -153,6 +173,17 @@ const DebtRecordForm: React.FC<DebtRecordFormProps> = ({
         onConfirm={() => setActiveField(null)}
         activeFieldLabel={getActiveFieldLabel()}
         currentValue={getCurrentFieldValue()}
+      />
+
+      <DatePickerWheel
+        isOpen={showDatePicker}
+        onClose={() => setShowDatePicker(false)}
+        max={new Date()}
+        value={parseDateString(date)}
+        onConfirm={(val) => {
+          setDate(formatDateToString(val));
+        }}
+        title="选择日期"
       />
     </div>
   );

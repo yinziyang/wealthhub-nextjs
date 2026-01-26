@@ -266,9 +266,9 @@ function Dashboard() {
         <main className="flex-1 px-5 pt-[100px] pb-28 outline-none">
           {currentTab === 'assets' ? (
             assetView === 'gold-detail' && selectedGoldAsset ? (
-              <GoldDetailPage asset={selectedGoldAsset} marketData={marketData} />
+              <GoldDetailPage asset={selectedGoldAsset} />
             ) : assetView === 'usd-detail' && selectedUsdAsset ? (
-              <UsdDetailPage asset={selectedUsdAsset} marketData={marketData} />
+              <UsdDetailPage asset={selectedUsdAsset} />
             ) : assetView === 'rmb-detail' && selectedRmbAsset ? (
               <RmbDetailPage asset={selectedRmbAsset} />
             ) : assetView === 'debt-detail' && selectedDebtAsset ? (

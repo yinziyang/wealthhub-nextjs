@@ -1,252 +1,150 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Asset, GoldPurchaseRecord } from "@/types";
 import { formatNumber } from "@/utils";
-import type { MarketDataHistoryResponse } from "@/lib/api-response";
-import { getGoldPurchases } from "@/lib/api/gold-purchases";
+import type {
+  MarketDataHistoryResponse,
+  MarketDataHourlyHistoryResponse,
+} from "@/lib/api-response";
 import GoldPriceChart from "@/components/GoldPriceChart";
 import GoldPurchaseRecords from "@/components/GoldPurchaseRecords";
 
 interface GoldDetailPageProps {
   asset: Asset;
-  marketData?: MarketDataHistoryResponse | null;
 }
-
-// 模块级别的请求缓存，防止 React Strict Mode 导致重复请求
-let globalFetchPromiseGold: Promise<GoldPurchaseRecord[]> | null = null;
-let globalFetchPromisePrice: Promise<MarketDataHistoryResponse> | null = null;
 
 const GoldDetailPage: React.FC<GoldDetailPageProps> = ({
   asset,
-  marketData,
 }) => {
-  const [purchaseRecords, setPurchaseRecords] = useState<GoldPurchaseRecord[]>(
-    [],
-  );
+  // State definitions
+  const [data24h, setData24h] = useState<MarketDataHourlyHistoryResponse | null>(null);
+  const [data7d, setData7d] = useState<MarketDataHistoryResponse | null>(null);
+  const [purchaseRecords, setPurchaseRecords] = useState<GoldPurchaseRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentPrice, setCurrentPrice] = useState<number>(0);
-  const [priceLoading, setPriceLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // 获取购买记录
-  const fetchRecords = useCallback(async () => {
-    // 如果已经有正在进行的全局请求，复用它
-    if (globalFetchPromiseGold) {
-      try {
-        const data = await globalFetchPromiseGold;
-        setPurchaseRecords(data);
-        setLoading(false);
-      } catch (err) {
-        console.error("获取黄金买入记录失败:", err);
-        setLoading(false);
-      }
-      return;
-    }
-
-    // 创建新的请求并缓存到全局变量
-    setLoading(true);
-    globalFetchPromiseGold = getGoldPurchases();
-
-    try {
-      const data = await globalFetchPromiseGold;
-      setPurchaseRecords(data);
-    } catch (err) {
-      console.error("获取黄金买入记录失败:", err);
-    } finally {
-      setLoading(false);
-      // 请求完成后立即清除全局缓存
-      globalFetchPromiseGold = null;
-    }
-  }, []);
-
-  // 获取实时金价数据
+  // Consolidated data fetching
   useEffect(() => {
     let isCancelled = false;
     const controller = new AbortController();
 
-    async function fetchPriceData() {
-      // 如果已经有正在进行的全局请求，复用它
-      if (globalFetchPromisePrice) {
-        try {
-          const data = await globalFetchPromisePrice;
-          if (!isCancelled) {
-            extractPriceFromData(data);
-            setPriceLoading(false);
-          }
-        } catch (err) {
-          if (!isCancelled) {
-            console.error("获取金价数据失败:", err);
-            setPriceLoading(false);
-          }
-        }
-        return;
-      }
-
-      // 创建新的请求并缓存到全局变量
-      // 使用 hours=1 只获取最近1小时的数据，避免和 GoldPriceChart 的请求冲突
-      setPriceLoading(true);
-      globalFetchPromisePrice = fetch("/api/market-data/history?hours=1", {
-        signal: controller.signal,
-      })
-        .then((res) => res.json())
-        .then((result) => {
-          if (result.success) {
-            return result.data as MarketDataHistoryResponse;
-          }
-          throw new Error("获取数据失败");
-        });
-
-      try {
-        const data = await globalFetchPromisePrice;
-
-        // 如果组件已卸载或请求被取消，不更新状态
-        if (!isCancelled) {
-          extractPriceFromData(data);
-        }
-      } catch (err) {
-        if (!isCancelled) {
-          console.error("获取金价数据失败:", err);
-        }
-      } finally {
-        if (!isCancelled) {
-          setPriceLoading(false);
-        }
-        // 请求完成后立即清除全局缓存
-        globalFetchPromisePrice = null;
-      }
-    }
-
-    // 从市场数据中提取最新金价（只提取价格，不计算涨跌幅）
-    function extractPriceFromData(data: MarketDataHistoryResponse) {
-      if (data?.gold_price) {
-        const entries = Object.entries(data.gold_price);
-        if (entries.length > 0) {
-          // 按 key 排序，取最大的（最新的）
-          const sorted = entries.sort(([a], [b]) => parseInt(b) - parseInt(a));
-          const latestPrice = sorted[0][1] || 0;
-          setCurrentPrice(latestPrice);
-        }
-      }
-    }
-
-    // Debounce to fetch to avoid double-calling in Strict Mode
-    const timeoutId = setTimeout(() => {
-      fetchPriceData();
-    }, 50);
-
-    return () => {
-      isCancelled = true;
-      clearTimeout(timeoutId);
-      controller.abort();
-    };
-  }, []);
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    async function fetchData() {
-      // 如果已经有正在进行的全局请求，复用它
-      if (globalFetchPromiseGold) {
-        try {
-          const data = await globalFetchPromiseGold;
-          if (!isCancelled) {
-            setPurchaseRecords(data);
-            setLoading(false);
-          }
-        } catch (err) {
-          if (!isCancelled) {
-            console.error("获取黄金买入记录失败:", err);
-            setLoading(false);
-          }
-        }
-        return;
-      }
-
-      // 创建新的请求并缓存到全局变量
+    async function fetchAllData() {
       setLoading(true);
-      globalFetchPromiseGold = getGoldPurchases();
+      setError(null);
 
       try {
-        const data = await globalFetchPromiseGold;
+        // Parallel requests
+        const [res24h, res7d, resRecords] = await Promise.all([
+          fetch('/api/market-data/history?hours=24', { signal: controller.signal }),
+          fetch('/api/market-data/history?days=7', { signal: controller.signal }),
+          fetch('/api/gold-purchases', { signal: controller.signal }),
+        ]);
 
-        // 如果组件已卸载或请求被取消，不更新状态
-        if (!isCancelled) {
-          setPurchaseRecords(data);
+        // Parse responses
+        const [json24h, json7d, jsonRecords] = await Promise.all([
+          res24h.json(),
+          res7d.json(),
+          resRecords.json(),
+        ]);
+
+        if (isCancelled) return;
+
+        // Update state
+        if (json24h.success) {
+          setData24h(json24h.data);
+        }
+        if (json7d.success) {
+          setData7d(json7d.data);
+        }
+        if (jsonRecords.success) {
+          setPurchaseRecords(jsonRecords.data);
         }
       } catch (err) {
-        if (!isCancelled) {
-          console.error("获取黄金买入记录失败:", err);
+        if (!isCancelled && err instanceof Error && err.name !== 'AbortError') {
+          console.error('获取数据失败:', err);
+          setError('数据加载失败');
         }
       } finally {
         if (!isCancelled) {
           setLoading(false);
         }
-        // 请求完成后立即清除全局缓存
-        globalFetchPromiseGold = null;
       }
     }
 
-    fetchData();
+    fetchAllData();
 
     return () => {
       isCancelled = true;
+      controller.abort();
     };
   }, []);
 
+  // Calculate current price and change
+  const currentPrice = useMemo(() => {
+    if (!data24h?.gold_price) return 0;
+    const entries = Object.entries(data24h.gold_price);
+    if (entries.length === 0) return 0;
+    const sorted = entries.sort(([a], [b]) => b.localeCompare(a));
+    return sorted[0][1] || 0;
+  }, [data24h]);
 
-  // 从 marketData 获取今日涨跌幅（保持之前的获取方式不变）
-  let todayChangePercent = 0;
-  if (marketData?.gold_price) {
-    const entries = Object.entries(marketData.gold_price);
-    if (entries.length > 0) {
-      const sorted = entries.sort(([a], [b]) => parseInt(b) - parseInt(a));
-      if (sorted.length > 1) {
-        const todayPrice = sorted[0][1];
-        const yesterdayPrice = sorted[1][1];
-        todayChangePercent =
-          ((todayPrice - yesterdayPrice) / yesterdayPrice) * 100;
+  const todayChangePercent = useMemo(() => {
+    if (!data7d?.gold_price) return 0;
+    const entries = Object.entries(data7d.gold_price);
+    if (entries.length < 2) return 0;
+    const sorted = entries.sort(([a], [b]) => parseInt(b) - parseInt(a));
+    const todayPrice = sorted[0][1];
+    const yesterdayPrice = sorted[1][1];
+    if (yesterdayPrice === 0) return 0;
+    return ((todayPrice - yesterdayPrice) / yesterdayPrice) * 100;
+  }, [data7d]);
+
+  // Refresh records after update/delete
+  const fetchRecords = useCallback(async () => {
+    try {
+      const res = await fetch('/api/gold-purchases');
+      const json = await res.json();
+      if (json.success) {
+        setPurchaseRecords(json.data);
       }
+    } catch (err) {
+      console.error('刷新购买记录失败:', err);
     }
-  }
+  }, []);
 
-  // 根据购买记录计算持仓克数（weight字段累加）
+  // Calculate statistics
   const totalWeight = purchaseRecords.reduce(
     (sum, record) => sum + record.weight,
     0,
   );
 
-  // 总投资成本（total_price累加）
   const totalInvestment = purchaseRecords.reduce(
     (sum, record) => sum + record.total_price,
     0,
   );
 
-  // 持仓均价 = 总投资成本 / 持仓克数
   const averagePrice = totalWeight > 0 ? totalInvestment / totalWeight : 0;
-
-  // 当前总市值 = 持仓克数 * 当前金价
   const currentMarketValue = totalWeight * currentPrice;
-
-  // 累计持有盈亏 = 当前总市值 - 总投资成本
   const profitLoss = currentMarketValue - totalInvestment;
 
   return (
     <div className="space-y-4 -mt-2">
-      {/* 上半部分：价格和盈亏信息 */}
+      {/* Top Section: Price and Profit/Loss */}
       <div
         className="rounded-2xl bg-surface-darker border border-[rgba(167,125,47,0.12)] overflow-hidden shadow-sm"
         style={{
           borderRadius: "32px",
         }}
       >
-        {/* 当前价格区域 */}
+        {/* Current Price Area */}
         <div className="px-5 pt-5 pb-4 bg-gradient-to-b from-yellow-50/30 dark:from-yellow-900/10 to-transparent">
           <div className="mb-3">
             <div className="text-yellow-500 dark:text-yellow-400 text-4xl font-extrabold tracking-tight mb-0.5">
-              {priceLoading ? (
-                <span className="inline-block w-32 h-10 bg-yellow-200 dark:bg-yellow-800 rounded animate-pulse" />
-              ) : (
+              {currentPrice > 0 ? (
                 formatNumber(currentPrice, 2)
+              ) : (
+                <span className="inline-block w-32 h-10 bg-yellow-200 dark:bg-yellow-800 rounded animate-pulse" />
               )}
             </div>
             <div className="flex items-center justify-between">
@@ -266,7 +164,7 @@ const GoldDetailPage: React.FC<GoldDetailPageProps> = ({
             </div>
           </div>
 
-          {/* 累计持有盈亏 */}
+          {/* Cumulative Profit/Loss */}
           <div className="pt-3">
             <div className="text-emerald-500 dark:text-emerald-400 text-2xl font-extrabold tracking-tight mb-0.5">
               {loading
@@ -279,7 +177,7 @@ const GoldDetailPage: React.FC<GoldDetailPageProps> = ({
           </div>
         </div>
 
-        {/* 持仓信息 */}
+        {/* Holdings Info */}
         <div className="px-5 py-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -301,7 +199,7 @@ const GoldDetailPage: React.FC<GoldDetailPageProps> = ({
           </div>
         </div>
 
-        {/* 投资成本和市值 */}
+        {/* Investment and Market Value */}
         <div className="px-5 py-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -324,14 +222,21 @@ const GoldDetailPage: React.FC<GoldDetailPageProps> = ({
         </div>
       </div>
 
-      {/* 价格走势图表 */}
-      <GoldPriceChart />
+      {/* Price Chart */}
+      {loading ? (
+        <div className="rounded-2xl bg-surface-darker border border-[rgba(167,125,47,0.12)] overflow-hidden shadow-sm p-4 h-[250px] flex items-center justify-center">
+          <div className="text-slate-500 dark:text-slate-400 text-sm animate-pulse">
+            加载图表数据...
+          </div>
+        </div>
+      ) : (
+        <GoldPriceChart initialData24h={data24h} />
+      )}
 
-      {/* 购买记录 */}
+      {/* Purchase Records */}
       <GoldPurchaseRecords
         asset={asset}
         currentGoldPrice={currentPrice}
-        marketData={marketData}
         records={purchaseRecords}
         loading={loading}
         onRefresh={fetchRecords}

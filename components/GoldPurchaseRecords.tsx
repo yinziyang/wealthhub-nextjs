@@ -3,7 +3,6 @@
 import React, { useMemo, useState } from 'react';
 import { Asset, GoldPurchaseRecord, UpdateGoldPurchaseRequest } from '@/types';
 import { formatNumber } from '@/utils';
-import { MarketDataHistoryResponse } from '@/lib/api-response';
 import { updateGoldPurchase, deleteGoldPurchase } from '@/lib/api/gold-purchases';
 import SwipeableRecordItem from './SwipeableRecordItem';
 import EditRecordModal from './EditRecordModal';
@@ -13,7 +12,6 @@ import { Toast } from '@/components/Toast';
 interface GoldPurchaseRecordsProps {
   asset: Asset;
   currentGoldPrice: number;
-  marketData?: MarketDataHistoryResponse | null;
   records: GoldPurchaseRecord[];
   loading: boolean;
   onRefresh?: () => void | Promise<void>;

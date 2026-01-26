@@ -8,6 +8,7 @@ type TimeRange = '30d' | '90d' | '1y';
 
 interface UsdExchangeRateChartProps {
   className?: string;
+  initialData30d?: MarketDataHistoryResponse | null;
 }
 
 interface ChartDataPoint {
@@ -16,7 +17,7 @@ interface ChartDataPoint {
   label: string;
 }
 
-const UsdExchangeRateChart: React.FC<UsdExchangeRateChartProps> = ({ className }) => {
+const UsdExchangeRateChart: React.FC<UsdExchangeRateChartProps> = ({ className, initialData30d }) => {
   const [timeRange, setTimeRange] = useState<TimeRange>('30d');
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [selectedPoint, setSelectedPoint] = useState<(ChartDataPoint & { x: number; y: number }) | null>(null);
@@ -29,6 +30,14 @@ const UsdExchangeRateChart: React.FC<UsdExchangeRateChartProps> = ({ className }
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
+
+      // 如果当前是 30d 视图且提供了初始数据，直接使用
+      if (timeRange === '30d' && initialData30d) {
+        const data = parseMarketData(initialData30d, '30d');
+        setChartData(data);
+        setIsLoading(false);
+        return;
+      }
 
       try {
         let url: string;
@@ -74,7 +83,7 @@ const UsdExchangeRateChart: React.FC<UsdExchangeRateChartProps> = ({ className }
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [timeRange]);
+  }, [timeRange, initialData30d]);
 
   useEffect(() => {
     setSelectedPoint(null);

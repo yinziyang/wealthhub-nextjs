@@ -1,106 +1,48 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Asset, DebtRecord } from '@/types';
 import { formatNumber } from '@/utils';
-import { getDebtRecords } from '@/lib/api/debt-records';
 import DebtRecordList from '@/components/DebtRecordList';
 
 interface DebtDetailPageProps {
   asset: Asset;
 }
 
-// 模块级别的请求缓存，防止 React Strict Mode 导致重复请求
-let globalFetchPromiseDebt: Promise<DebtRecord[]> | null = null;
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const DebtDetailPage: React.FC<DebtDetailPageProps> = ({ asset }) => {
   const [records, setRecords] = useState<DebtRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 从记录中计算总债务金额
-  const totalDebt = records.reduce((sum, record) => sum + record.amount, 0);
-
-  // 统一获取数据，只调用一次 API（使用模块级缓存防止 React Strict Mode 导致重复请求）
-  const fetchRecords = useCallback(async () => {
-    // 如果已经有正在进行的全局请求，复用它
-    if (globalFetchPromiseDebt) {
-      try {
-        const data = await globalFetchPromiseDebt;
-        setRecords(data);
-        setLoading(false);
-      } catch (err) {
-        console.error('获取债权记录失败:', err);
-        setError(err instanceof Error ? err.message : '获取数据失败');
-        setLoading(false);
-      }
-      return;
-    }
-
-    // 创建新的请求并缓存到全局变量
-    setLoading(true);
-    setError(null);
-    globalFetchPromiseDebt = getDebtRecords();
-
-    try {
-      const data = await globalFetchPromiseDebt;
-      setRecords(data);
-    } catch (err) {
-      console.error('获取债权记录失败:', err);
-      setError(err instanceof Error ? err.message : '获取数据失败');
-    } finally {
-      setLoading(false);
-      // 请求完成后立即清除全局缓存
-      globalFetchPromiseDebt = null;
-    }
-  }, []);
-
+  // Consolidated data fetching
   useEffect(() => {
     let isCancelled = false;
+    const controller = new AbortController();
 
     async function fetchData() {
-      // 如果已经有正在进行的全局请求，复用它
-      if (globalFetchPromiseDebt) {
-        try {
-          const data = await globalFetchPromiseDebt;
-          if (!isCancelled) {
-            setRecords(data);
-            setLoading(false);
-          }
-        } catch (err) {
-          if (!isCancelled) {
-            console.error('获取债权记录失败:', err);
-            setError(err instanceof Error ? err.message : '获取数据失败');
-            setLoading(false);
-          }
-        }
-        return;
-      }
-
-      // 创建新的请求并缓存到全局变量
       setLoading(true);
       setError(null);
-      globalFetchPromiseDebt = getDebtRecords();
 
       try {
-        const data = await globalFetchPromiseDebt;
-        
-        // 如果组件已卸载或请求被取消，不更新状态
-        if (!isCancelled) {
-          setRecords(data);
+        const res = await fetch('/api/debt-records', { signal: controller.signal });
+        const json = await res.json();
+
+        if (isCancelled) return;
+
+        if (json.success) {
+          setRecords(json.data);
+        } else {
+          setError('获取数据失败');
         }
       } catch (err) {
-        if (!isCancelled) {
+        if (!isCancelled && err instanceof Error && err.name !== 'AbortError') {
           console.error('获取债权记录失败:', err);
-          setError(err instanceof Error ? err.message : '获取数据失败');
+          setError('数据加载失败');
         }
       } finally {
         if (!isCancelled) {
           setLoading(false);
         }
-        // 请求完成后立即清除全局缓存
-        globalFetchPromiseDebt = null;
       }
     }
 
@@ -108,17 +50,36 @@ const DebtDetailPage: React.FC<DebtDetailPageProps> = ({ asset }) => {
 
     return () => {
       isCancelled = true;
+      controller.abort();
     };
   }, []);
 
-  // 计算最早借款日期
-  const earliestLoanDate = React.useMemo(() => {
+  // Calculate total debt
+  const totalDebt = useMemo(() => {
+    return records.reduce((sum, record) => sum + record.amount, 0);
+  }, [records]);
+
+  // Calculate earliest loan date
+  const earliestLoanDate = useMemo(() => {
     if (records.length === 0) return null;
     const sortedRecords = [...records].sort(
       (a, b) => new Date(a.loan_date).getTime() - new Date(b.loan_date).getTime()
     );
     return new Date(sortedRecords[0].loan_date);
   }, [records]);
+
+  // Refresh records
+  const fetchRecords = useCallback(async () => {
+    try {
+      const res = await fetch('/api/debt-records');
+      const json = await res.json();
+      if (json.success) {
+        setRecords(json.data);
+      }
+    } catch (err) {
+      console.error('刷新债权记录失败:', err);
+    }
+  }, []);
 
   return (
     <div className="space-y-4 -mt-2">

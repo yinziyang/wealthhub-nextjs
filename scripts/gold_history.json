@@ -1,0 +1,191 @@
+[
+  {
+    "gold_price_per_gram": 983.90,
+    "purchase_channel": "菜百",
+    "weight": 50,
+    "handling_fee_per_gram": 14.9,
+    "purchase_date": "2025-10-21"
+  },
+  {
+    "gold_price_per_gram": 808.00,
+    "purchase_channel": "菜百",
+    "weight": 50,
+    "handling_fee_per_gram": 15,
+    "purchase_date": "2025-04-23"
+  },
+  {
+    "gold_price_per_gram": 808.00,
+    "purchase_channel": "菜百",
+    "weight": 50,
+    "handling_fee_per_gram": 15,
+    "purchase_date": "2025-04-23"
+  },
+  {
+    "gold_price_per_gram": 733.00,
+    "purchase_channel": "菜百",
+    "weight": 200,
+    "handling_fee_per_gram": 12,
+    "purchase_date": "2025-03-29"
+  },
+  {
+    "gold_price_per_gram": 622.00,
+    "purchase_channel": "菜百",
+    "weight": 200,
+    "handling_fee_per_gram": 12,
+    "purchase_date": "2024-12-29"
+  },
+  {
+    "gold_price_per_gram": 640.00,
+    "purchase_channel": "菜百",
+    "weight": 200,
+    "handling_fee_per_gram": 12,
+    "purchase_date": "2024-11-01"
+  },
+  {
+    "gold_price_per_gram": 632.50,
+    "purchase_channel": "菜百",
+    "weight": 200,
+    "handling_fee_per_gram": 12,
+    "purchase_date": "2024-10-19"
+  },
+  {
+    "gold_price_per_gram": 611.50,
+    "purchase_channel": "菜百",
+    "weight": 200,
+    "handling_fee_per_gram": 12,
+    "purchase_date": "2024-10-13"
+  },
+  {
+    "gold_price_per_gram": 601.00,
+    "purchase_channel": "菜百",
+    "weight": 100,
+    "handling_fee_per_gram": 11,
+    "purchase_date": "2024-09-22"
+  },
+  {
+    "gold_price_per_gram": 579.00,
+    "purchase_channel": "菜百",
+    "weight": 100,
+    "handling_fee_per_gram": 11,
+    "purchase_date": "2024-05-18"
+  },
+  {
+    "gold_price_per_gram": 569.00,
+    "purchase_channel": "菜百",
+    "weight": 100,
+    "handling_fee_per_gram": 10,
+    "purchase_date": "2024-04-13"
+  },
+  {
+    "gold_price_per_gram": 491.50,
+    "purchase_channel": "菜百",
+    "weight": 100,
+    "handling_fee_per_gram": 10,
+    "purchase_date": "2024-01-20"
+  },
+  {
+    "gold_price_per_gram": 451.50,
+    "purchase_channel": "菜百",
+    "weight": 100,
+    "handling_fee_per_gram": 10,
+    "purchase_date": "2023-10-05"
+  },
+  {
+    "gold_price_per_gram": 481.50,
+    "purchase_channel": "菜百",
+    "weight": 100,
+    "handling_fee_per_gram": 10,
+    "purchase_date": "2023-09-23"
+  },
+  {
+    "gold_price_per_gram": 477.10,
+    "purchase_channel": "菜百",
+    "weight": 200,
+    "handling_fee_per_gram": 10,
+    "purchase_date": "2023-09-09"
+  },
+  {
+    "gold_price_per_gram": 469.20,
+    "purchase_channel": "菜百",
+    "weight": 100,
+    "handling_fee_per_gram": 10,
+    "purchase_date": "2023-08-26"
+  },
+  {
+    "gold_price_per_gram": 539.04,
+    "purchase_channel": "周大生·娃手镯",
+    "weight": 7.48,
+    "handling_fee_per_gram": 0,
+    "purchase_date": "2023-05-02"
+  },
+  {
+    "gold_price_per_gram": 433.50,
+    "purchase_channel": "菜百",
+    "weight": 50,
+    "handling_fee_per_gram": 10,
+    "purchase_date": "2023-01-27"
+  },
+  {
+    "gold_price_per_gram": 428.50,
+    "purchase_channel": "菜百",
+    "weight": 50,
+    "handling_fee_per_gram": 10,
+    "purchase_date": "2023-01-15"
+  },
+  {
+    "gold_price_per_gram": 0.01,
+    "purchase_channel": "可可吊坠",
+    "weight": 1,
+    "handling_fee_per_gram": 0,
+    "purchase_date": "2022-06-01"
+  },
+  {
+    "gold_price_per_gram": 412.00,
+    "purchase_channel": "中国黄金",
+    "weight": 50,
+    "handling_fee_per_gram": 0,
+    "purchase_date": "2022-05-04"
+  },
+  {
+    "gold_price_per_gram": 417.50,
+    "purchase_channel": "中国黄金",
+    "weight": 50,
+    "handling_fee_per_gram": 0,
+    "purchase_date": "2022-05-02"
+  },
+  {
+    "gold_price_per_gram": 0.00,
+    "purchase_channel": "可可手链",
+    "weight": 3,
+    "handling_fee_per_gram": 0,
+    "purchase_date": "2022-03-01"
+  },
+  {
+    "gold_price_per_gram": 0.00,
+    "purchase_channel": "小肥公司10周年金币",
+    "weight": 10,
+    "handling_fee_per_gram": 0,
+    "purchase_date": "2019-09-01"
+  },
+  {
+    "gold_price_per_gram": 450.00,
+    "purchase_channel": "菜百·项链",
+    "weight": 20,
+    "handling_fee_per_gram": 0,
+    "purchase_date": "2013-10-01"
+  },
+  {
+    "gold_price_per_gram": 450.00,
+    "purchase_channel": "手镯",
+    "weight": 30,
+    "handling_fee_per_gram": 0,
+    "purchase_date": "2013-10-01"
+  },
+  {
+    "gold_price_per_gram": 350.00,
+    "purchase_channel": "妈首饰",
+    "weight": 20,
+    "handling_fee_per_gram": 0,
+    "purchase_date": "2010-10-01"
+  }
+]

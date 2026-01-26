@@ -1,0 +1,31 @@
+-- Generated SQL for inserting gold purchase records
+-- User: 711b3ad0-b3b9-47e6-9b74-7a3c05644f31
+-- Total Records: 27
+
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2025-10-20T16:00:00.000Z', 50, 983.9, 14.9, '菜百');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2025-04-22T16:00:00.000Z', 50, 808, 15, '菜百');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2025-04-22T16:00:00.000Z', 50, 808, 15, '菜百');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2025-03-28T16:00:00.000Z', 200, 733, 12, '菜百');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2024-12-28T16:00:00.000Z', 200, 622, 12, '菜百');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2024-10-31T16:00:00.000Z', 200, 640, 12, '菜百');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2024-10-18T16:00:00.000Z', 200, 632.5, 12, '菜百');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2024-10-12T16:00:00.000Z', 200, 611.5, 12, '菜百');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2024-09-21T16:00:00.000Z', 100, 601, 11, '菜百');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2024-05-17T16:00:00.000Z', 100, 579, 11, '菜百');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2024-04-12T16:00:00.000Z', 100, 569, 10, '菜百');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2024-01-19T16:00:00.000Z', 100, 491.5, 10, '菜百');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2023-10-04T16:00:00.000Z', 100, 451.5, 10, '菜百');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2023-09-22T16:00:00.000Z', 100, 481.5, 10, '菜百');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2023-09-08T16:00:00.000Z', 200, 477.1, 10, '菜百');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2023-08-25T16:00:00.000Z', 100, 469.2, 10, '菜百');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2023-05-01T16:00:00.000Z', 7.48, 539.04, 0, '周大生·娃手镯');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2023-01-26T16:00:00.000Z', 50, 433.5, 10, '菜百');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2023-01-14T16:00:00.000Z', 50, 428.5, 10, '菜百');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2022-05-31T16:00:00.000Z', 1, 0.01, 0, '可可吊坠');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2022-05-03T16:00:00.000Z', 50, 412, 0, '中国黄金');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2022-05-01T16:00:00.000Z', 50, 417.5, 0, '中国黄金');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2022-02-28T16:00:00.000Z', 3, 0, 0, '可可手链');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2019-08-31T16:00:00.000Z', 10, 0, 0, '小肥公司10周年金币');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2013-09-30T16:00:00.000Z', 20, 450, 0, '菜百·项链');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2013-09-30T16:00:00.000Z', 30, 450, 0, '手镯');
+INSERT INTO gold_purchase_records (user_id, purchase_date, weight, gold_price_per_gram, handling_fee_per_gram, purchase_channel) VALUES ('711b3ad0-b3b9-47e6-9b74-7a3c05644f31', '2010-09-30T16:00:00.000Z', 20, 350, 0, '妈首饰');

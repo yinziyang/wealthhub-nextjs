@@ -1,18 +1,14 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Asset, RmbDepositRecord, RmbDepositChartItem } from '@/types';
 import { formatNumber } from '@/utils';
-import { getRmbDeposits } from '@/lib/api/rmb-deposits';
 import RmbDepositChart from '@/components/RmbDepositChart';
 import RmbDepositRecords from '@/components/RmbDepositRecords';
 
 interface RmbDetailPageProps {
   asset: Asset;
 }
-
-// 模块级别的请求缓存，防止 React Strict Mode 导致重复请求
-let globalFetchPromise: Promise<RmbDepositRecord[]> | null = null;
 
 function formatToBeijingDate(utcDateStr: string): string {
   const date = new Date(utcDateStr);
@@ -25,94 +21,40 @@ function formatToBeijingDate(utcDateStr: string): string {
   return `${year}${month}${day}`;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const RmbDetailPage: React.FC<RmbDetailPageProps> = ({ asset }) => {
   const [records, setRecords] = useState<RmbDepositRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 从记录中计算总存款金额
-  const totalDeposit = records.reduce((sum, record) => sum + record.amount, 0);
-
-  // 统一获取数据，只调用一次 API（使用模块级缓存防止 React Strict Mode 导致重复请求）
-  const fetchRecords = React.useCallback(async () => {
-    // 如果已经有正在进行的全局请求，复用它
-    if (globalFetchPromise) {
-      try {
-        const data = await globalFetchPromise;
-        setRecords(data);
-        setLoading(false);
-      } catch (err) {
-        console.error('获取人民币存款记录失败:', err);
-        setError(err instanceof Error ? err.message : '获取数据失败');
-        setLoading(false);
-      }
-      return;
-    }
-
-    // 创建新的请求并缓存到全局变量
-    setLoading(true);
-    setError(null);
-    globalFetchPromise = getRmbDeposits();
-
-    try {
-      const data = await globalFetchPromise;
-      setRecords(data);
-    } catch (err) {
-      console.error('获取人民币存款记录失败:', err);
-      setError(err instanceof Error ? err.message : '获取数据失败');
-    } finally {
-      setLoading(false);
-      // 请求完成后立即清除全局缓存
-      globalFetchPromise = null;
-    }
-  }, []);
-
+  // Consolidated data fetching
   useEffect(() => {
     let isCancelled = false;
+    const controller = new AbortController();
 
     async function fetchData() {
-      // 如果已经有正在进行的全局请求，复用它
-      if (globalFetchPromise) {
-        try {
-          const data = await globalFetchPromise;
-          if (!isCancelled) {
-            setRecords(data);
-            setLoading(false);
-          }
-        } catch (err) {
-          if (!isCancelled) {
-            console.error('获取人民币存款记录失败:', err);
-            setError(err instanceof Error ? err.message : '获取数据失败');
-            setLoading(false);
-          }
-        }
-        return;
-      }
-
-      // 创建新的请求并缓存到全局变量
       setLoading(true);
       setError(null);
-      globalFetchPromise = getRmbDeposits();
 
       try {
-        const data = await globalFetchPromise;
-        
-        // 如果组件已卸载或请求被取消，不更新状态
-        if (!isCancelled) {
-          setRecords(data);
+        const res = await fetch('/api/rmb-deposits', { signal: controller.signal });
+        const json = await res.json();
+
+        if (isCancelled) return;
+
+        if (json.success) {
+          setRecords(json.data);
+        } else {
+          setError('获取数据失败');
         }
       } catch (err) {
-        if (!isCancelled) {
+        if (!isCancelled && err instanceof Error && err.name !== 'AbortError') {
           console.error('获取人民币存款记录失败:', err);
-          setError(err instanceof Error ? err.message : '获取数据失败');
+          setError('数据加载失败');
         }
       } finally {
         if (!isCancelled) {
           setLoading(false);
         }
-        // 请求完成后立即清除全局缓存
-        globalFetchPromise = null;
       }
     }
 
@@ -120,10 +62,26 @@ const RmbDetailPage: React.FC<RmbDetailPageProps> = ({ asset }) => {
 
     return () => {
       isCancelled = true;
+      controller.abort();
     };
   }, []);
 
-  // 从记录生成图表数据（按日期合并）
+  // Calculate statistics
+  const totalDeposit = useMemo(() => {
+    return records.reduce((sum, record) => sum + record.amount, 0);
+  }, [records]);
+
+  const depositCount = records.length;
+
+  const earliestDepositDate = useMemo(() => {
+    if (records.length === 0) return null;
+    const sortedRecords = [...records].sort(
+      (a, b) => new Date(a.deposit_date).getTime() - new Date(b.deposit_date).getTime()
+    );
+    return new Date(sortedRecords[0].deposit_date);
+  }, [records]);
+
+  // Generate chart data
   const chartData = useMemo<RmbDepositChartItem[]>(() => {
     if (records.length === 0) return [];
 
@@ -153,26 +111,18 @@ const RmbDetailPage: React.FC<RmbDetailPageProps> = ({ asset }) => {
       }));
   }, [records]);
 
-  // 更新统计信息
-  useEffect(() => {
-    if (records.length > 0) {
-      const countEl = document.getElementById('deposit-count');
-      if (countEl) countEl.textContent = `${records.length} 笔`;
-
-      const sortedRecords = [...records].sort(
-        (a, b) => new Date(a.deposit_date).getTime() - new Date(b.deposit_date).getTime()
-      );
-      const earliestEl = document.getElementById('earliest-date');
-      if (earliestEl) {
-        const date = new Date(sortedRecords[0].deposit_date);
-        earliestEl.textContent = date.toLocaleDateString('zh-CN', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-        });
+  // Refresh records
+  const fetchRecords = useCallback(async () => {
+    try {
+      const res = await fetch('/api/rmb-deposits');
+      const json = await res.json();
+      if (json.success) {
+        setRecords(json.data);
       }
+    } catch (err) {
+      console.error('刷新存款记录失败:', err);
     }
-  }, [records]);
+  }, []);
 
   return (
     <div className="space-y-4 -mt-2">
@@ -201,16 +151,22 @@ const RmbDetailPage: React.FC<RmbDetailPageProps> = ({ asset }) => {
               <div className="text-slate-500 dark:text-slate-400 text-[10px] font-medium mb-1 uppercase tracking-wide">
                 存款笔数
               </div>
-              <div className="text-slate-900 dark:text-white text-base font-bold" id="deposit-count">
-                {loading ? '--' : `${records.length}`} 笔
+              <div className="text-slate-900 dark:text-white text-base font-bold">
+                {loading ? '--' : `${depositCount} 笔`}
               </div>
             </div>
             <div>
               <div className="text-slate-500 dark:text-slate-400 text-[10px] font-medium mb-1 uppercase tracking-wide">
                 最早存款
               </div>
-              <div className="text-slate-900 dark:text-white text-base font-bold" id="earliest-date">
-                --
+              <div className="text-slate-900 dark:text-white text-base font-bold">
+                {loading || !earliestDepositDate
+                  ? '--'
+                  : earliestDepositDate.toLocaleDateString('zh-CN', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                    })}
               </div>
             </div>
           </div>

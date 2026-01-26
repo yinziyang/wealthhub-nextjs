@@ -11,6 +11,7 @@ type TimeRange = "24h" | "30d" | "1y";
 
 interface GoldPriceChartProps {
   className?: string;
+  initialData24h?: MarketDataHourlyHistoryResponse | null;
 }
 
 interface ChartDataPoint {
@@ -19,7 +20,7 @@ interface ChartDataPoint {
   label: string;
 }
 
-const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
+const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className, initialData24h }) => {
   const [timeRange, setTimeRange] = useState<TimeRange>("24h");
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [selectedPoint, setSelectedPoint] = useState<
@@ -35,6 +36,15 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
+
+      // 如果当前是 24h 视图且提供了初始数据，直接使用
+      if (timeRange === "24h" && initialData24h) {
+        const data = parseMarketData(initialData24h, "24h");
+        setChartData(data);
+        setIsLoading(false);
+        // 重要：如果有 initialData24h，不要再发请求
+        return;
+      }
 
       try {
         let url: string;
@@ -80,7 +90,7 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [timeRange]);
+  }, [timeRange, initialData24h]);
 
   // Reset selected point when data changes
   useEffect(() => {
