@@ -75,6 +75,7 @@ const SwipeableRecordItem: React.FC<SwipeableRecordItemProps> = ({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       style={{ touchAction: isSwiped ? 'none' : 'pan-y' }}
+      className="rounded-xl overflow-hidden"
     >
       <SwipeAction
         ref={ref}

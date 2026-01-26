@@ -94,7 +94,7 @@ const AssetOverview: React.FC<AssetOverviewProps> = ({
 
   return (
     <section
-      className="relative -mt-2 bg-surface-darker border border-[rgba(167,125,47,0.12)] pt-8 pb-8 px-6 mb-8 shadow-[0_10px_40px_-10px_rgba(167,125,47,0.15)]"
+      className="relative -mt-2 bg-surface-darker border border-[rgba(167,125,47,0.12)] pt-5 pb-4 px-5 mb-4 shadow-[0_10px_40px_-10px_rgba(167,125,47,0.15)]"
       style={{
         borderRadius: "32px",
         overflow: "hidden",
@@ -114,8 +114,8 @@ const AssetOverview: React.FC<AssetOverviewProps> = ({
         }}
       ></div>
 
-      <div className="relative z-10 w-full mb-8">
-        <p className="text-slate-400 text-[10px] font-bold tracking-[0.2em] uppercase opacity-70 mb-2">
+      <div className="relative z-10 w-full mb-3">
+        <p className="text-slate-400 text-[10px] font-bold tracking-[0.2em] uppercase opacity-70 mb-0.5">
           净资产估值 (CNY)
         </p>
         <div className="flex items-baseline gap-1">

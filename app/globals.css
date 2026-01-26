@@ -87,3 +87,11 @@ body {
 .animate-slide-up {
   animation: slide-up 0.3s ease-out;
 }
+
+/* SwipeAction 圆角修复 - 确保外层容器和内部元素都有圆角 */
+.adm-swipe-action,
+.adm-swipe-action-content,
+.adm-swipe-action-content > * {
+  border-radius: 0.75rem !important;
+  overflow: hidden !important;
+}

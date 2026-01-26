@@ -27,6 +27,17 @@ const formatDateToString = (date: Date) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+// 将 ISO 8601 格式的日期字符串转换为 YYYY-MM-DD 格式
+const normalizeDateString = (dateStr: string): string => {
+  if (!dateStr) return getTodayString();
+  // 如果是 ISO 格式（包含 T），提取日期部分
+  if (dateStr.includes('T')) {
+    return dateStr.split('T')[0];
+  }
+  // 如果已经是 YYYY-MM-DD 格式，直接返回
+  return dateStr;
+};
+
 interface DebtRecordFormProps {
   mode: 'add' | 'edit';
   initialData?: DebtRecord;
@@ -50,7 +61,7 @@ const DebtRecordForm: React.FC<DebtRecordFormProps> = ({
 
   useEffect(() => {
     if (mode === 'edit' && initialData) {
-      setDate(initialData.loan_date);
+      setDate(normalizeDateString(initialData.loan_date));
       setName(initialData.debtor_name);
       setAmount(initialData.amount.toString());
     }
