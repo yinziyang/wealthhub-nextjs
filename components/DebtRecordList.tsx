@@ -1,99 +1,146 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { DebtRecord } from '@/types';
+import React, { useEffect, useState, useCallback } from 'react';
+import { DebtRecord, UpdateDebtRecordRequest } from '@/types';
 import { formatNumber } from '@/utils';
-import { getDebtRecords } from '@/lib/api/debt-records';
+import { getDebtRecords, updateDebtRecord, deleteDebtRecord } from '@/lib/api/debt-records';
 import SwipeableRecordItem from './SwipeableRecordItem';
 import EditRecordModal from './EditRecordModal';
-import { Dialog } from 'antd-mobile';
+import ConfirmDialog from './ConfirmDialog';
+import { Toast } from '@/components/Toast';
 
 // 模块级别的请求缓存，防止 React Strict Mode 导致重复请求
 let globalFetchPromiseDebt: Promise<DebtRecord[]> | null = null;
 
-const DebtRecordList: React.FC = () => {
-  const [records, setRecords] = useState<DebtRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+interface DebtRecordListProps {
+  records?: DebtRecord[];
+  loading?: boolean;
+  error?: string | null;
+  onRefresh?: () => void | Promise<void>;
+}
+
+const DebtRecordList: React.FC<DebtRecordListProps> = ({
+  records: externalRecords,
+  loading: externalLoading,
+  error: externalError,
+  onRefresh: externalOnRefresh,
+}) => {
+  const [internalRecords, setInternalRecords] = useState<DebtRecord[]>([]);
+  const [internalLoading, setInternalLoading] = useState(true);
+  const [internalError, setInternalError] = useState<string | null>(null);
+  
+  // 如果外部提供了数据，使用外部数据；否则使用内部状态
+  const records = externalRecords ?? internalRecords;
+  const loading = externalLoading ?? internalLoading;
+  const error = externalError ?? internalError;
   const [activeSwipeId, setActiveSwipeId] = useState<string | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<DebtRecord | null>(null);
+  
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // 统一获取数据，只调用一次 API（使用模块级缓存防止 React Strict Mode 导致重复请求）
+  const fetchRecords = useCallback(async () => {
+    // 如果外部提供了 onRefresh，调用它
+    if (externalOnRefresh) {
+      await externalOnRefresh();
+      return;
+    }
+
+    // 如果已经有正在进行的全局请求，复用它
+    if (globalFetchPromiseDebt) {
+      try {
+        const data = await globalFetchPromiseDebt;
+        setInternalRecords(data);
+        setInternalLoading(false);
+      } catch (err) {
+        console.error('获取债权记录失败:', err);
+        setInternalError(err instanceof Error ? err.message : '获取数据失败');
+        setInternalLoading(false);
+      }
+      return;
+    }
+
+    // 创建新的请求并缓存到全局变量
+    setInternalLoading(true);
+    setInternalError(null);
+    globalFetchPromiseDebt = getDebtRecords();
+
+    try {
+      const data = await globalFetchPromiseDebt;
+      setInternalRecords(data);
+    } catch (err) {
+      console.error('获取债权记录失败:', err);
+      setInternalError(err instanceof Error ? err.message : '获取数据失败');
+    } finally {
+      setInternalLoading(false);
+      // 请求完成后立即清除全局缓存
+      globalFetchPromiseDebt = null;
+    }
+  }, [externalOnRefresh]);
+
   useEffect(() => {
+    // 如果外部提供了数据，不需要内部获取
+    if (externalRecords !== undefined) {
+      return;
+    }
+
     let isCancelled = false;
 
-    async function fetchRecords() {
+    async function fetchData() {
       // 如果已经有正在进行的全局请求，复用它
       if (globalFetchPromiseDebt) {
         try {
           const data = await globalFetchPromiseDebt;
           if (!isCancelled) {
-            setRecords(data);
-            setLoading(false);
+            setInternalRecords(data);
+            setInternalLoading(false);
           }
         } catch (err) {
           if (!isCancelled) {
             console.error('获取债权记录失败:', err);
-            setError(err instanceof Error ? err.message : '获取数据失败');
-            setLoading(false);
+            setInternalError(err instanceof Error ? err.message : '获取数据失败');
+            setInternalLoading(false);
           }
         }
         return;
       }
 
       // 创建新的请求并缓存到全局变量
-      setLoading(true);
-      setError(null);
+      setInternalLoading(true);
+      setInternalError(null);
       globalFetchPromiseDebt = getDebtRecords();
 
       try {
         const data = await globalFetchPromiseDebt;
-        
+
         // 如果组件已卸载或请求被取消，不更新状态
         if (!isCancelled) {
-          setRecords(data);
+          setInternalRecords(data);
         }
       } catch (err) {
         if (!isCancelled) {
           console.error('获取债权记录失败:', err);
-          setError(err instanceof Error ? err.message : '获取数据失败');
+          setInternalError(err instanceof Error ? err.message : '获取数据失败');
         }
       } finally {
         if (!isCancelled) {
-          setLoading(false);
+          setInternalLoading(false);
         }
         // 请求完成后立即清除全局缓存
         globalFetchPromiseDebt = null;
       }
     }
 
-    fetchRecords();
+    fetchData();
 
     return () => {
       isCancelled = true;
     };
-  }, []);
-
-  useEffect(() => {
-    if (records.length > 0) {
-      const countEl = document.getElementById('debt-count');
-      if (countEl) countEl.textContent = `${records.length} 笔`;
-
-      const sortedRecords = [...records].sort(
-        (a, b) => new Date(a.loan_date).getTime() - new Date(b.loan_date).getTime()
-      );
-      const earliestEl = document.getElementById('earliest-loan-date');
-      if (earliestEl) {
-        const date = new Date(sortedRecords[0].loan_date);
-        earliestEl.textContent = date.toLocaleDateString('zh-CN', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-        });
-      }
-    }
-  }, [records]);
+  }, [externalRecords]);
 
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr);
@@ -112,22 +159,44 @@ const DebtRecordList: React.FC = () => {
     }
   };
 
-  const handleDelete = (id: string) => {
-    Dialog.confirm({
-      title: '确认删除',
-      content: '删除后无法恢复，确定要删除这条记录吗？',
-      confirmText: '删除',
-      cancelText: '取消',
-      onConfirm: async () => {
-        console.log('删除记录:', id);
-      },
-    });
+  const handleDeleteClick = (id: string) => {
+    setRecordToDelete(id);
+    setDeleteDialogOpen(true);
   };
 
-  const handleSaveEdit = async (updatedData: any) => {
-    console.log('保存编辑:', updatedData);
-    setEditModalOpen(false);
-    setEditingRecord(null);
+  const handleConfirmDelete = async () => {
+    if (!recordToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      await deleteDebtRecord(recordToDelete);
+      Toast.show({ icon: 'success', content: '删除成功' });
+      setDeleteDialogOpen(false);
+      setRecordToDelete(null);
+      // 刷新数据而不是更新本地状态
+      await fetchRecords();
+    } catch (error) {
+      console.error('删除记录失败:', error);
+      Toast.show({ icon: 'fail', content: error instanceof Error ? error.message : '删除失败' });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleSaveEdit = async (updatedData: object) => {
+    if (!editingRecord) return;
+
+    try {
+      await updateDebtRecord(editingRecord.id, updatedData as UpdateDebtRecordRequest);
+      Toast.show({ icon: 'success', content: '保存成功' });
+      setEditModalOpen(false);
+      setEditingRecord(null);
+      // 刷新数据而不是更新本地状态
+      await fetchRecords();
+    } catch (error) {
+      console.error('更新记录失败:', error);
+      Toast.show({ icon: 'fail', content: error instanceof Error ? error.message : '保存失败' });
+    }
   };
 
   if (loading) {
@@ -186,7 +255,7 @@ const DebtRecordList: React.FC = () => {
             key={record.id}
             recordId={record.id}
             onEdit={handleEdit}
-            onDelete={handleDelete}
+            onDelete={handleDeleteClick}
             activeSwipeId={activeSwipeId}
             onSwipeOpen={setActiveSwipeId}
             onSwipeClose={() => setActiveSwipeId(null)}
@@ -227,6 +296,17 @@ const DebtRecordList: React.FC = () => {
         recordType="debt"
         recordData={editingRecord}
         onSave={handleSaveEdit}
+      />
+
+      <ConfirmDialog
+        isOpen={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="确认删除"
+        content="删除后无法恢复，确定要删除这条记录吗？"
+        confirmText="删除"
+        isDestructive
+        isLoading={isDeleting}
       />
     </div>
   );

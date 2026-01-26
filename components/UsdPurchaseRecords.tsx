@@ -1,18 +1,22 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
-import { Asset, UsdPurchaseRecord } from '@/types';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { Asset, UsdPurchaseRecord, UpdateUsdPurchaseRequest } from '@/types';
 import { formatNumber } from '@/utils';
-import { getUsdPurchases } from '@/lib/api/usd-purchases';
+import { getUsdPurchases, updateUsdPurchase, deleteUsdPurchase } from '@/lib/api/usd-purchases';
 import { MarketDataHistoryResponse } from '@/lib/api-response';
 import SwipeableRecordItem from './SwipeableRecordItem';
 import EditRecordModal from './EditRecordModal';
-import { Dialog } from 'antd-mobile';
+import ConfirmDialog from './ConfirmDialog';
+import { Toast } from '@/components/Toast';
 
 interface UsdPurchaseRecordsProps {
   asset: Asset;
   currentExchangeRate: number;
   marketData?: MarketDataHistoryResponse | null;
+  records?: UsdPurchaseRecord[];
+  loading?: boolean;
+  onRefresh?: () => void | Promise<void>;
 }
 
 interface RecordWithProfit extends UsdPurchaseRecord {
@@ -26,48 +30,104 @@ let globalFetchPromiseUsd: Promise<UsdPurchaseRecord[]> | null = null;
 
 const UsdPurchaseRecords: React.FC<UsdPurchaseRecordsProps> = ({
   currentExchangeRate,
+  records: externalRecords,
+  loading: externalLoading,
+  onRefresh: externalOnRefresh,
 }) => {
-  const [records, setRecords] = useState<UsdPurchaseRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [internalRecords, setInternalRecords] = useState<UsdPurchaseRecord[]>([]);
+  const [internalLoading, setInternalLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // 如果外部提供了数据，使用外部数据；否则使用内部状态
+  const records = externalRecords ?? internalRecords;
+  const loading = externalLoading ?? internalLoading;
   const [activeSwipeId, setActiveSwipeId] = useState<string | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<UsdPurchaseRecord | null>(null);
+  
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // 统一获取数据，只调用一次 API（使用模块级缓存防止 React Strict Mode 导致重复请求）
+  const fetchRecords = useCallback(async () => {
+    // 如果外部提供了 onRefresh，调用它
+    if (externalOnRefresh) {
+      await externalOnRefresh();
+      return;
+    }
+
+    // 如果已经有正在进行的全局请求，复用它
+    if (globalFetchPromiseUsd) {
+      try {
+        const data = await globalFetchPromiseUsd;
+        setInternalRecords(data);
+        setInternalLoading(false);
+      } catch (err) {
+        console.error('获取美元购汇记录失败:', err);
+        setError(err instanceof Error ? err.message : '获取数据失败');
+        setInternalLoading(false);
+      }
+      return;
+    }
+
+    // 创建新的请求并缓存到全局变量
+    setInternalLoading(true);
+    setError(null);
+    globalFetchPromiseUsd = getUsdPurchases();
+
+    try {
+      const data = await globalFetchPromiseUsd;
+      setInternalRecords(data);
+    } catch (err) {
+      console.error('获取美元购汇记录失败:', err);
+      setError(err instanceof Error ? err.message : '获取数据失败');
+    } finally {
+      setInternalLoading(false);
+      // 请求完成后立即清除全局缓存
+      globalFetchPromiseUsd = null;
+    }
+  }, [externalOnRefresh]);
+
   useEffect(() => {
+    // 如果外部提供了数据，不需要内部获取
+    if (externalRecords !== undefined) {
+      return;
+    }
+
     let isCancelled = false;
 
-    async function fetchRecords() {
+    async function fetchData() {
       // 如果已经有正在进行的全局请求，复用它
       if (globalFetchPromiseUsd) {
         try {
           const data = await globalFetchPromiseUsd;
           if (!isCancelled) {
-            setRecords(data);
-            setLoading(false);
+            setInternalRecords(data);
+            setInternalLoading(false);
           }
         } catch (err) {
           if (!isCancelled) {
             console.error('获取美元购汇记录失败:', err);
             setError(err instanceof Error ? err.message : '获取数据失败');
-            setLoading(false);
+            setInternalLoading(false);
           }
         }
         return;
       }
 
       // 创建新的请求并缓存到全局变量
-      setLoading(true);
+      setInternalLoading(true);
       setError(null);
       globalFetchPromiseUsd = getUsdPurchases();
 
       try {
         const data = await globalFetchPromiseUsd;
-        
+
         // 如果组件已卸载或请求被取消，不更新状态
         if (!isCancelled) {
-          setRecords(data);
+          setInternalRecords(data);
         }
       } catch (err) {
         if (!isCancelled) {
@@ -76,19 +136,19 @@ const UsdPurchaseRecords: React.FC<UsdPurchaseRecordsProps> = ({
         }
       } finally {
         if (!isCancelled) {
-          setLoading(false);
+          setInternalLoading(false);
         }
         // 请求完成后立即清除全局缓存
         globalFetchPromiseUsd = null;
       }
     }
 
-    fetchRecords();
+    fetchData();
 
     return () => {
       isCancelled = true;
     };
-  }, []);
+  }, [externalRecords]);
 
   const recordsWithProfit = useMemo<RecordWithProfit[]>(() => {
     return records.map(record => {
@@ -121,22 +181,44 @@ const UsdPurchaseRecords: React.FC<UsdPurchaseRecordsProps> = ({
     }
   };
 
-  const handleDelete = (id: string) => {
-    Dialog.confirm({
-      title: '确认删除',
-      content: '删除后无法恢复，确定要删除这条记录吗？',
-      confirmText: '删除',
-      cancelText: '取消',
-      onConfirm: async () => {
-        console.log('删除记录:', id);
-      },
-    });
+  const handleDeleteClick = (id: string) => {
+    setRecordToDelete(id);
+    setDeleteDialogOpen(true);
   };
 
-  const handleSaveEdit = async (updatedData: any) => {
-    console.log('保存编辑:', updatedData);
-    setEditModalOpen(false);
-    setEditingRecord(null);
+  const handleConfirmDelete = async () => {
+    if (!recordToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      await deleteUsdPurchase(recordToDelete);
+      Toast.show({ icon: 'success', content: '删除成功' });
+      setDeleteDialogOpen(false);
+      setRecordToDelete(null);
+      // 刷新数据而不是更新本地状态
+      await fetchRecords();
+    } catch (error) {
+      console.error('删除记录失败:', error);
+      Toast.show({ icon: 'fail', content: error instanceof Error ? error.message : '删除失败' });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleSaveEdit = async (updatedData: object) => {
+    if (!editingRecord) return;
+
+    try {
+      await updateUsdPurchase(editingRecord.id, updatedData as UpdateUsdPurchaseRequest);
+      Toast.show({ icon: 'success', content: '保存成功' });
+      setEditModalOpen(false);
+      setEditingRecord(null);
+      // 刷新数据而不是更新本地状态
+      await fetchRecords();
+    } catch (error) {
+      console.error('更新记录失败:', error);
+      Toast.show({ icon: 'fail', content: error instanceof Error ? error.message : '保存失败' });
+    }
   };
 
   if (loading) {
@@ -195,7 +277,7 @@ const UsdPurchaseRecords: React.FC<UsdPurchaseRecordsProps> = ({
             key={record.id}
             recordId={record.id}
             onEdit={handleEdit}
-            onDelete={handleDelete}
+            onDelete={handleDeleteClick}
             activeSwipeId={activeSwipeId}
             onSwipeOpen={setActiveSwipeId}
             onSwipeClose={() => setActiveSwipeId(null)}
@@ -259,6 +341,17 @@ const UsdPurchaseRecords: React.FC<UsdPurchaseRecordsProps> = ({
         recordType="usd"
         recordData={editingRecord}
         onSave={handleSaveEdit}
+      />
+
+      <ConfirmDialog
+        isOpen={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="确认删除"
+        content="删除后无法恢复，确定要删除这条记录吗？"
+        confirmText="删除"
+        isDestructive
+        isLoading={isDeleting}
       />
     </div>
   );

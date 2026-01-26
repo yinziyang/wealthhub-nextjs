@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { Asset, GoldPurchaseRecord } from '@/types';
+import { Asset, GoldPurchaseRecord, UpdateGoldPurchaseRequest } from '@/types';
 import { formatNumber } from '@/utils';
 import { MarketDataHistoryResponse } from '@/lib/api-response';
+import { updateGoldPurchase, deleteGoldPurchase } from '@/lib/api/gold-purchases';
 import SwipeableRecordItem from './SwipeableRecordItem';
 import EditRecordModal from './EditRecordModal';
-import { Dialog } from 'antd-mobile';
+import ConfirmDialog from './ConfirmDialog';
+import { Toast } from '@/components/Toast';
 
 interface GoldPurchaseRecordsProps {
   asset: Asset;
@@ -14,6 +16,7 @@ interface GoldPurchaseRecordsProps {
   marketData?: MarketDataHistoryResponse | null;
   records: GoldPurchaseRecord[];
   loading: boolean;
+  onRefresh?: () => void | Promise<void>;
 }
 
 interface RecordWithProfit extends GoldPurchaseRecord {
@@ -26,13 +29,24 @@ const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
   currentGoldPrice,
   records,
   loading,
+  onRefresh,
 }) => {
   const [activeSwipeId, setActiveSwipeId] = useState<string | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<GoldPurchaseRecord | null>(null);
+  const [localRecords, setLocalRecords] = useState<GoldPurchaseRecord[]>(records);
+  
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  React.useEffect(() => {
+    setLocalRecords(records);
+  }, [records]);
 
   const recordsWithProfit = useMemo<RecordWithProfit[]>(() => {
-    return records.map(record => {
+    return localRecords.map(record => {
       const currentValue = record.weight * currentGoldPrice;
       const profitLoss = currentValue - record.total_price;
 
@@ -43,7 +57,7 @@ const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
         purchaseCost: record.total_price,
       };
     });
-  }, [records, currentGoldPrice]);
+  }, [localRecords, currentGoldPrice]);
 
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr);
@@ -62,22 +76,48 @@ const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
     }
   };
 
-  const handleDelete = (id: string) => {
-    Dialog.confirm({
-      title: '确认删除',
-      content: '删除后无法恢复，确定要删除这条记录吗？',
-      confirmText: '删除',
-      cancelText: '取消',
-      onConfirm: async () => {
-        console.log('删除记录:', id);
-      },
-    });
+  const handleDeleteClick = (id: string) => {
+    setRecordToDelete(id);
+    setDeleteDialogOpen(true);
   };
 
-  const handleSaveEdit = async (updatedData: any) => {
-    console.log('保存编辑:', updatedData);
-    setEditModalOpen(false);
-    setEditingRecord(null);
+  const handleConfirmDelete = async () => {
+    if (!recordToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      await deleteGoldPurchase(recordToDelete);
+      Toast.show({ icon: 'success', content: '删除成功' });
+      setDeleteDialogOpen(false);
+      setRecordToDelete(null);
+      // 刷新数据而不是更新本地状态
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (error) {
+      console.error('删除记录失败:', error);
+      Toast.show({ icon: 'fail', content: error instanceof Error ? error.message : '删除失败' });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleSaveEdit = async (updatedData: object) => {
+    if (!editingRecord) return;
+
+    try {
+      await updateGoldPurchase(editingRecord.id, updatedData as UpdateGoldPurchaseRequest);
+      Toast.show({ icon: 'success', content: '保存成功' });
+      setEditModalOpen(false);
+      setEditingRecord(null);
+      // 刷新数据而不是更新本地状态
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (error) {
+      console.error('更新记录失败:', error);
+      Toast.show({ icon: 'fail', content: error instanceof Error ? error.message : '保存失败' });
+    }
   };
 
   if (loading) {
@@ -123,7 +163,7 @@ const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
             key={record.id}
             recordId={record.id}
             onEdit={handleEdit}
-            onDelete={handleDelete}
+            onDelete={handleDeleteClick}
             activeSwipeId={activeSwipeId}
             onSwipeOpen={setActiveSwipeId}
             onSwipeClose={() => setActiveSwipeId(null)}
@@ -201,6 +241,17 @@ const GoldPurchaseRecords: React.FC<GoldPurchaseRecordsProps> = ({
         recordType="gold"
         recordData={editingRecord}
         onSave={handleSaveEdit}
+      />
+
+      <ConfirmDialog
+        isOpen={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="确认删除"
+        content="删除后无法恢复，确定要删除这条记录吗？"
+        confirmText="删除"
+        isDestructive
+        isLoading={isDeleting}
       />
     </div>
   );

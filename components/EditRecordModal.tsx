@@ -18,7 +18,7 @@ interface EditRecordModalProps {
   onClose: () => void;
   recordType: RecordType;
   recordData: RecordData | null;
-  onSave: (updatedData: RecordData) => Promise<void>;
+  onSave: (updatedData: object) => Promise<void>;
 }
 
 const DEFAULT_GOLD_PRICE = 612.50;
@@ -78,12 +78,12 @@ const EditRecordModal: React.FC<EditRecordModalProps> = ({
     }
   }, [isOpen]);
 
-  const handleSubmit = async (data: any) => {
+  const handleSubmit = async (data: object) => {
     setIsSaving(true);
     setErrorMessage('');
 
     try {
-      await onSave(data as RecordData);
+      await onSave(data);
       setIsSaving(false);
     } catch (error) {
       console.error('保存失败:', error);

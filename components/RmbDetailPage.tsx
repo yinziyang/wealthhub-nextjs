@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Asset, RmbDepositRecord, RmbDepositChartItem } from '@/types';
 import { formatNumber } from '@/utils';
 import { getRmbDeposits } from '@/lib/api/rmb-deposits';
@@ -25,17 +25,53 @@ function formatToBeijingDate(utcDateStr: string): string {
   return `${year}${month}${day}`;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const RmbDetailPage: React.FC<RmbDetailPageProps> = ({ asset }) => {
-  const totalDeposit = asset.amount;
   const [records, setRecords] = useState<RmbDepositRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // 从记录中计算总存款金额
+  const totalDeposit = records.reduce((sum, record) => sum + record.amount, 0);
+
   // 统一获取数据，只调用一次 API（使用模块级缓存防止 React Strict Mode 导致重复请求）
+  const fetchRecords = React.useCallback(async () => {
+    // 如果已经有正在进行的全局请求，复用它
+    if (globalFetchPromise) {
+      try {
+        const data = await globalFetchPromise;
+        setRecords(data);
+        setLoading(false);
+      } catch (err) {
+        console.error('获取人民币存款记录失败:', err);
+        setError(err instanceof Error ? err.message : '获取数据失败');
+        setLoading(false);
+      }
+      return;
+    }
+
+    // 创建新的请求并缓存到全局变量
+    setLoading(true);
+    setError(null);
+    globalFetchPromise = getRmbDeposits();
+
+    try {
+      const data = await globalFetchPromise;
+      setRecords(data);
+    } catch (err) {
+      console.error('获取人民币存款记录失败:', err);
+      setError(err instanceof Error ? err.message : '获取数据失败');
+    } finally {
+      setLoading(false);
+      // 请求完成后立即清除全局缓存
+      globalFetchPromise = null;
+    }
+  }, []);
+
   useEffect(() => {
     let isCancelled = false;
 
-    async function fetchRecords() {
+    async function fetchData() {
       // 如果已经有正在进行的全局请求，复用它
       if (globalFetchPromise) {
         try {
@@ -80,7 +116,7 @@ const RmbDetailPage: React.FC<RmbDetailPageProps> = ({ asset }) => {
       }
     }
 
-    fetchRecords();
+    fetchData();
 
     return () => {
       isCancelled = true;
@@ -147,7 +183,11 @@ const RmbDetailPage: React.FC<RmbDetailPageProps> = ({ asset }) => {
         <div className="px-5 pt-5 pb-4 bg-gradient-to-b from-blue-50/30 dark:from-blue-900/10 to-transparent">
           <div className="mb-3">
             <div className="text-blue-500 dark:text-blue-400 text-4xl font-extrabold tracking-tight mb-0.5">
-              ¥{formatNumber(totalDeposit, 0)}
+              {loading ? (
+                <span className="inline-block w-32 h-10 bg-blue-200 dark:bg-blue-800 rounded animate-pulse" />
+              ) : (
+                `¥${formatNumber(totalDeposit, 0)}`
+              )}
             </div>
             <div className="text-slate-500 dark:text-slate-300 text-xs font-medium">
               人民币存款总额
@@ -179,7 +219,7 @@ const RmbDetailPage: React.FC<RmbDetailPageProps> = ({ asset }) => {
 
       <RmbDepositChart chartData={chartData} isLoading={loading} error={error} />
 
-      <RmbDepositRecords records={records} loading={loading} error={error} />
+      <RmbDepositRecords records={records} loading={loading} error={error} onRefresh={fetchRecords} />
     </div>
   );
 };

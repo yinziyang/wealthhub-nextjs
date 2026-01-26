@@ -1,22 +1,30 @@
 'use client';
 
 import React, { useState } from 'react';
-import { RmbDepositRecord } from '@/types';
+import { RmbDepositRecord, UpdateRmbDepositRequest } from '@/types';
 import { formatNumber } from '@/utils';
+import { updateRmbDeposit, deleteRmbDeposit } from '@/lib/api/rmb-deposits';
 import SwipeableRecordItem from './SwipeableRecordItem';
 import EditRecordModal from './EditRecordModal';
-import { Dialog } from 'antd-mobile';
+import ConfirmDialog from './ConfirmDialog';
+import { Toast } from '@/components/Toast';
 
 interface RmbDepositRecordsProps {
   records: RmbDepositRecord[];
   loading: boolean;
   error: string | null;
+  onRefresh?: () => void | Promise<void>;
 }
 
-const RmbDepositRecords: React.FC<RmbDepositRecordsProps> = ({ records, loading, error }) => {
+const RmbDepositRecords: React.FC<RmbDepositRecordsProps> = ({ records, loading, error, onRefresh }) => {
   const [activeSwipeId, setActiveSwipeId] = useState<string | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<RmbDepositRecord | null>(null);
+  
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr);
@@ -35,22 +43,48 @@ const RmbDepositRecords: React.FC<RmbDepositRecordsProps> = ({ records, loading,
     }
   };
 
-  const handleDelete = (id: string) => {
-    Dialog.confirm({
-      title: '确认删除',
-      content: '删除后无法恢复，确定要删除这条记录吗？',
-      confirmText: '删除',
-      cancelText: '取消',
-      onConfirm: async () => {
-        console.log('删除记录:', id);
-      },
-    });
+  const handleDeleteClick = (id: string) => {
+    setRecordToDelete(id);
+    setDeleteDialogOpen(true);
   };
 
-  const handleSaveEdit = async (updatedData: any) => {
-    console.log('保存编辑:', updatedData);
-    setEditModalOpen(false);
-    setEditingRecord(null);
+  const handleConfirmDelete = async () => {
+    if (!recordToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      await deleteRmbDeposit(recordToDelete);
+      Toast.show({ icon: 'success', content: '删除成功' });
+      setDeleteDialogOpen(false);
+      setRecordToDelete(null);
+      // 刷新数据而不是重新加载整个页面
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (error) {
+      console.error('删除记录失败:', error);
+      Toast.show({ icon: 'fail', content: error instanceof Error ? error.message : '删除失败' });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleSaveEdit = async (updatedData: object) => {
+    if (!editingRecord) return;
+
+    try {
+      await updateRmbDeposit(editingRecord.id, updatedData as UpdateRmbDepositRequest);
+      Toast.show({ icon: 'success', content: '保存成功' });
+      setEditModalOpen(false);
+      setEditingRecord(null);
+      // 刷新数据而不是重新加载整个页面
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (error) {
+      console.error('更新记录失败:', error);
+      Toast.show({ icon: 'fail', content: error instanceof Error ? error.message : '保存失败' });
+    }
   };
 
   if (loading) {
@@ -109,7 +143,7 @@ const RmbDepositRecords: React.FC<RmbDepositRecordsProps> = ({ records, loading,
             key={record.id}
             recordId={record.id}
             onEdit={handleEdit}
-            onDelete={handleDelete}
+            onDelete={handleDeleteClick}
             activeSwipeId={activeSwipeId}
             onSwipeOpen={setActiveSwipeId}
             onSwipeClose={() => setActiveSwipeId(null)}
@@ -150,6 +184,17 @@ const RmbDepositRecords: React.FC<RmbDepositRecordsProps> = ({ records, loading,
         recordType="rmb"
         recordData={editingRecord}
         onSave={handleSaveEdit}
+      />
+
+      <ConfirmDialog
+        isOpen={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="确认删除"
+        content="删除后无法恢复，确定要删除这条记录吗？"
+        confirmText="删除"
+        isDestructive
+        isLoading={isDeleting}
       />
     </div>
   );
