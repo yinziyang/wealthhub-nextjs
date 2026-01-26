@@ -5,6 +5,9 @@ import { Asset, UsdPurchaseRecord } from '@/types';
 import { formatNumber } from '@/utils';
 import { getUsdPurchases } from '@/lib/api/usd-purchases';
 import { MarketDataHistoryResponse } from '@/lib/api-response';
+import SwipeableRecordItem from './SwipeableRecordItem';
+import EditRecordModal from './EditRecordModal';
+import { Dialog } from 'antd-mobile';
 
 interface UsdPurchaseRecordsProps {
   asset: Asset;
@@ -27,6 +30,9 @@ const UsdPurchaseRecords: React.FC<UsdPurchaseRecordsProps> = ({
   const [records, setRecords] = useState<UsdPurchaseRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeSwipeId, setActiveSwipeId] = useState<string | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<UsdPurchaseRecord | null>(null);
 
   // 统一获取数据，只调用一次 API（使用模块级缓存防止 React Strict Mode 导致重复请求）
   useEffect(() => {
@@ -107,6 +113,32 @@ const UsdPurchaseRecords: React.FC<UsdPurchaseRecordsProps> = ({
     });
   };
 
+  const handleEdit = (id: string) => {
+    const record = recordsWithProfit.find(r => r.id === id);
+    if (record) {
+      setEditingRecord(record);
+      setEditModalOpen(true);
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    Dialog.confirm({
+      title: '确认删除',
+      content: '删除后无法恢复，确定要删除这条记录吗？',
+      confirmText: '删除',
+      cancelText: '取消',
+      onConfirm: async () => {
+        console.log('删除记录:', id);
+      },
+    });
+  };
+
+  const handleSaveEdit = async (updatedData: any) => {
+    console.log('保存编辑:', updatedData);
+    setEditModalOpen(false);
+    setEditingRecord(null);
+  };
+
   if (loading) {
     return (
       <div className="space-y-3">
@@ -159,57 +191,75 @@ const UsdPurchaseRecords: React.FC<UsdPurchaseRecordsProps> = ({
 
       <div className="grid gap-2.5 max-h-[400px] overflow-y-auto pr-1">
         {recordsWithProfit.map((record) => (
-          <div
+          <SwipeableRecordItem
             key={record.id}
-            className="rounded-xl bg-surface-darker border border-[rgba(34,197,94,0.12)] p-3 shadow-sm"
+            recordId={record.id}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            activeSwipeId={activeSwipeId}
+            onSwipeOpen={setActiveSwipeId}
+            onSwipeClose={() => setActiveSwipeId(null)}
           >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-baseline gap-2">
-                <span className="text-lg font-bold text-slate-900 dark:text-white">
-                  {formatNumber(record.usd_amount, 2)}
-                  <span className="text-xs font-normal text-slate-500 ml-0.5">USD</span>
-                </span>
-                <span className="text-xs text-slate-400">
-                  {formatDate(record.purchase_date)}
-                </span>
-              </div>
-              <div className={`text-sm font-bold ${
-                record.profitLoss >= 0
-                  ? 'text-emerald-500'
-                  : 'text-red-500'
-              }`}>
-                {record.profitLoss >= 0 ? '+' : ''}¥{formatNumber(record.profitLoss, 0)}
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100 dark:border-white/5">
-              <div className="flex flex-col gap-1 text-slate-500 dark:text-slate-400">
-                <div className="flex items-center gap-1.5">
-                  <span className="opacity-70">汇率</span>
-                  <span className="font-medium text-slate-700 dark:text-slate-300">
-                    {formatNumber(record.exchange_rate, 4)}
+            <div className="rounded-xl bg-surface-darker border border-[rgba(34,197,94,0.12)] p-3 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-lg font-bold text-slate-900 dark:text-white">
+                    {formatNumber(record.usd_amount, 2)}
+                    <span className="text-xs font-normal text-slate-500 ml-0.5">USD</span>
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    {formatDate(record.purchase_date)}
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="opacity-70">渠道</span>
-                  <span className="font-medium text-slate-700 dark:text-slate-300">
-                    {record.purchase_channel}
-                  </span>
+                <div className={`text-sm font-bold ${
+                  record.profitLoss >= 0
+                    ? 'text-emerald-500'
+                    : 'text-red-500'
+                }`}>
+                  {record.profitLoss >= 0 ? '+' : ''}¥{formatNumber(record.profitLoss, 0)}
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1 items-end text-slate-500 dark:text-slate-400">
-                <div className="flex items-center gap-1">
-                  <span className="opacity-70">成本</span>
-                  <span className="font-bold text-emerald-600 dark:text-emerald-500 text-sm">
-                    ¥{formatNumber(record.total_rmb_amount, 0)}
-                  </span>
+              <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100 dark:border-white/5">
+                <div className="flex flex-col gap-1 text-slate-500 dark:text-slate-400">
+                  <div className="flex items-center gap-1.5">
+                    <span className="opacity-70">汇率</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-300">
+                      {formatNumber(record.exchange_rate, 4)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="opacity-70">渠道</span>
+                    <span className="font-medium text-slate-700 dark:text-slate-300">
+                      {record.purchase_channel}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1 items-end text-slate-500 dark:text-slate-400">
+                  <div className="flex items-center gap-1">
+                    <span className="opacity-70">成本</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-500 text-sm">
+                      ¥{formatNumber(record.total_rmb_amount, 0)}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </SwipeableRecordItem>
         ))}
       </div>
+
+      <EditRecordModal
+        isOpen={editModalOpen}
+        onClose={() => {
+          setEditModalOpen(false);
+          setEditingRecord(null);
+        }}
+        recordType="usd"
+        recordData={editingRecord}
+        onSave={handleSaveEdit}
+      />
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
+import AntdMobileProvider from "@/components/AntdMobileProvider";
 
 export const metadata: Metadata = {
   title: "Private Client Assets",
@@ -21,9 +22,11 @@ export default function RootLayout({
         <meta name="format-detection" content="telephone=no" />
       </head>
       <body className="antialiased" suppressHydrationWarning>
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+        <AntdMobileProvider>
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+        </AntdMobileProvider>
       </body>
     </html>
   );
