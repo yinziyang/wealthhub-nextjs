@@ -1,13 +1,17 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { createAssetObject, formatNumber } from '../utils';
-import { Asset } from '../types';
+import React, { useState, useEffect, useRef } from 'react';
 import { Wallet, DollarSign, LayoutGrid, Handshake, X } from 'lucide-react';
+import type { 
+  CreateGoldPurchaseRequest, 
+  CreateUsdPurchaseRequest, 
+  CreateRmbDepositRequest, 
+  CreateDebtRecordRequest 
+} from '@/types';
 import { GoldPurchaseForm, UsdPurchaseForm, DebtRecordForm, RmbDepositForm } from './forms';
 
 interface AddAssetModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (asset: Asset) => void;
+  onSave: () => void; // 改为无参数，只通知刷新数据
 }
 
 type AssetType = 'rmb' | 'usd' | 'gold' | 'debt';
@@ -125,23 +129,14 @@ const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose, onSave }
     };
   }, [isOpen]);
 
-  const handleSubmit = async (data: any) => {
-    let finalRmbValue = 0;
-    let details: {
-      usdAmount?: number;
-      weight?: number;
-      exchangeRate?: number;
-      goldPrice?: number;
-      handlingFee?: number;
-    } = {};
-
+  const handleSubmit = async (
+    data: CreateGoldPurchaseRequest | CreateUsdPurchaseRequest | CreateRmbDepositRequest | CreateDebtRecordRequest
+  ) => {
     setIsSaving(true);
     setErrorMessage('');
 
     try {
       if (selectedType === 'rmb') {
-        finalRmbValue = data.amount;
-
         const response = await fetch('/api/rmb-deposits', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -156,8 +151,6 @@ const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose, onSave }
           return;
         }
       } else if (selectedType === 'debt') {
-        finalRmbValue = data.amount;
-
         const response = await fetch('/api/debt-records', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -172,9 +165,6 @@ const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose, onSave }
           return;
         }
       } else if (selectedType === 'usd') {
-        finalRmbValue = data.usd_amount * data.exchange_rate;
-        details = { usdAmount: data.usd_amount, exchangeRate: data.exchange_rate };
-
         const response = await fetch('/api/usd-purchases', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -189,13 +179,6 @@ const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose, onSave }
           return;
         }
       } else if (selectedType === 'gold') {
-        finalRmbValue = data.weight * (data.gold_price_per_gram + data.handling_fee_per_gram);
-        details = {
-          weight: data.weight,
-          goldPrice: data.gold_price_per_gram,
-          handlingFee: data.handling_fee_per_gram,
-        };
-
         const response = await fetch('/api/gold-purchases', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -211,18 +194,10 @@ const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose, onSave }
         }
       }
 
-      const newAsset = createAssetObject(
-        selectedType,
-        data.purchase_channel || data.bank_name || data.debtor_name,
-        finalRmbValue,
-        isIncrease,
-        details,
-        data.purchase_date || data.deposit_date || data.loan_date
-      );
-
-      onSave(newAsset);
+      // 保存成功后，通知父组件刷新数据，而不是直接创建资产对象
       setIsSaving(false);
       onClose();
+      onSave(); // 通知父组件重新获取资产组合数据
     } catch (error) {
       console.error('保存失败:', error);
       setErrorMessage('网络错误，请重试');

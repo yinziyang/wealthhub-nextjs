@@ -185,8 +185,17 @@ function Dashboard() {
     };
   }, [currentTab]);
 
-  const handleAddAsset = (newAsset: Asset) => {
-    setAssets(prev => [newAsset, ...prev]);
+  const handleAddAsset = async () => {
+    // 重新获取资产组合数据，而不是在本地添加资产
+    setIsPortfolioLoading(true);
+    try {
+      const data = await fetchPortfolioAll();
+      setPortfolio(data);
+    } catch (error) {
+      console.error('刷新资产组合数据失败:', error);
+    } finally {
+      setIsPortfolioLoading(false);
+    }
   };
 
   const handleTabChange = (tab: CurrentTab) => {
