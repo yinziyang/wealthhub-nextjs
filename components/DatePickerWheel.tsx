@@ -426,7 +426,7 @@ export const DatePickerWheel = ({
   title = '选择日期'
 }: DatePickerWheelProps) => {
   const now = new Date();
-  const defaultMin = min || new Date(now.getFullYear() - 10, 0, 1);
+  const defaultMin = min || new Date(now.getFullYear() - 30, 0, 1);
   const defaultMax = max || new Date(now.getFullYear() + 10, 11, 31);
   
   const initialDate = value || (max && max < now ? max : now);
