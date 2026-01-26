@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { formatNumber } from '@/utils';
 import type { MarketDataHistoryResponse } from '@/lib/api-response';
 
-type TimeRange = '30d' | '90d';
+type TimeRange = '30d' | '90d' | '1y';
 
 interface UsdExchangeRateChartProps {
   className?: string;
@@ -31,9 +31,14 @@ const UsdExchangeRateChart: React.FC<UsdExchangeRateChartProps> = ({ className }
       setError(null);
 
       try {
-        const url = timeRange === '30d'
-          ? '/api/market-data/history?days=30'
-          : '/api/market-data/history?days=90';
+        let url: string;
+        if (timeRange === '30d') {
+          url = '/api/market-data/history?days=30';
+        } else if (timeRange === '90d') {
+          url = '/api/market-data/history?days=90';
+        } else {
+          url = '/api/market-data/history?days=365';
+        }
 
         const response = await fetch(url, {
           signal: controller.signal
@@ -83,7 +88,7 @@ const UsdExchangeRateChart: React.FC<UsdExchangeRateChartProps> = ({ className }
     const points: ChartDataPoint[] = [];
     const today = new Date();
     const dateRange: string[] = [];
-    const days = range === '30d' ? 30 : 90;
+    const days = range === '30d' ? 30 : range === '90d' ? 90 : 365;
 
     for (let i = 0; i < days; i++) {
       const date = new Date(today);
@@ -220,6 +225,15 @@ const UsdExchangeRateChart: React.FC<UsdExchangeRateChartProps> = ({ className }
               }`}
           >
             90天
+          </button>
+          <button
+            onClick={() => setTimeRange('1y')}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${timeRange === '1y'
+              ? 'bg-emerald-500 dark:bg-emerald-600 text-white'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+              }`}
+          >
+            一年
           </button>
         </div>
       </div>

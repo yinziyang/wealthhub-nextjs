@@ -1,10 +1,13 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { formatNumber } from '@/utils';
-import type { MarketDataHistoryResponse, MarketDataHourlyHistoryResponse } from '@/lib/api-response';
+import React, { useState, useEffect, useMemo } from "react";
+import { formatNumber } from "@/utils";
+import type {
+  MarketDataHistoryResponse,
+  MarketDataHourlyHistoryResponse,
+} from "@/lib/api-response";
 
-type TimeRange = '24h' | '30d';
+type TimeRange = "24h" | "30d" | "1y";
 
 interface GoldPriceChartProps {
   className?: string;
@@ -17,9 +20,11 @@ interface ChartDataPoint {
 }
 
 const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
-  const [timeRange, setTimeRange] = useState<TimeRange>('24h');
+  const [timeRange, setTimeRange] = useState<TimeRange>("24h");
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
-  const [selectedPoint, setSelectedPoint] = useState<(ChartDataPoint & { x: number; y: number }) | null>(null);
+  const [selectedPoint, setSelectedPoint] = useState<
+    (ChartDataPoint & { x: number; y: number }) | null
+  >(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,12 +37,17 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
       setError(null);
 
       try {
-        const url = timeRange === '24h'
-          ? '/api/market-data/history?hours=24'
-          : '/api/market-data/history?days=30';
+        let url: string;
+        if (timeRange === "24h") {
+          url = "/api/market-data/history?hours=24";
+        } else if (timeRange === "30d") {
+          url = "/api/market-data/history?days=30";
+        } else {
+          url = "/api/market-data/history?days=365";
+        }
 
         const response = await fetch(url, {
-          signal: controller.signal
+          signal: controller.signal,
         });
 
         const result = await response.json();
@@ -47,13 +57,13 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
             const data = parseMarketData(result.data, timeRange);
             setChartData(data);
           } else {
-            setError('获取数据失败');
+            setError("获取数据失败");
             setChartData([]);
           }
         }
       } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') return;
-        setError('网络错误');
+        if (err instanceof Error && err.name === "AbortError") return;
+        setError("网络错误");
         setChartData([]);
       } finally {
         if (!controller.signal.aborted) {
@@ -80,15 +90,15 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
   // 解析市场数据为图表数据点
   const parseMarketData = (
     data: MarketDataHistoryResponse | MarketDataHourlyHistoryResponse,
-    range: TimeRange
+    range: TimeRange,
   ): ChartDataPoint[] => {
     const goldPrices = data.gold_price || {};
     const points: ChartDataPoint[] = [];
 
-    if (range === '24h') {
+    if (range === "24h") {
       // 按小时数据：格式 "2026012020" (北京时间)
       const sortedKeys = Object.keys(goldPrices)
-        .filter(key => goldPrices[key] > 0)
+        .filter((key) => goldPrices[key] > 0)
         .sort((a, b) => a.localeCompare(b));
 
       sortedKeys.forEach((key) => {
@@ -103,22 +113,23 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
         const price = goldPrices[key];
 
         // 标签格式：HH:mm
-        const label = `${String(hour).padStart(2, '0')}:00`;
+        const label = `${String(hour).padStart(2, "0")}:00`;
 
         points.push({ timestamp, price, label });
       });
     } else {
       // 按天数据：格式 "20260101" (北京时间)
-      // 生成完整的30天日期范围
+      // 根据时间范围生成对应的天数
+      const days = range === "30d" ? 30 : 365;
       const today = new Date();
       const dateRange: string[] = [];
 
-      for (let i = 0; i < 30; i++) {
+      for (let i = 0; i < days; i++) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
         const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
         const dateKey = `${year}${month}${day}`;
         dateRange.push(dateKey);
       }
@@ -137,8 +148,14 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
         // 如果该日期有数据则使用，否则为0
         const price = goldPrices[dateKey] || 0;
 
-        // 标签格式：MM/DD
-        const label = `${String(month + 1).padStart(2, '0')}/${String(day).padStart(2, '0')}`;
+        // 标签格式：对于30天显示 MM/DD，对于一年显示 MM/DD 或更简洁的格式
+        let label: string;
+        if (range === "1y") {
+          // 一年数据：显示 MM/DD，但可能需要更稀疏的标签
+          label = `${String(month + 1).padStart(2, "0")}/${String(day).padStart(2, "0")}`;
+        } else {
+          label = `${String(month + 1).padStart(2, "0")}/${String(day).padStart(2, "0")}`;
+        }
 
         points.push({ timestamp, price, label });
       });
@@ -161,7 +178,7 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
     const chartHeight = height - padding.top - padding.bottom;
 
     // 过滤掉价格为0的数据点
-    const validPrices = chartData.map(d => d.price).filter(p => p > 0);
+    const validPrices = chartData.map((d) => d.price).filter((p) => p > 0);
     const minPrice = validPrices.length > 0 ? Math.min(...validPrices) : 0;
     const maxPrice = validPrices.length > 0 ? Math.max(...validPrices) : 0;
     const priceRange = maxPrice - minPrice || 1;
@@ -170,27 +187,38 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
     const priceMin = Math.max(0, minPrice - pricePadding);
     const priceMax = maxPrice + pricePadding;
 
-    const timestamps = chartData.map(d => d.timestamp);
+    // // Y轴最低值为当前最低值的一半，让图表底部有更多空间
+    // const priceMin = Math.max(0, minPrice * 0.8);
+    // // Y轴最高值为当前最高值的1.5倍，让图表顶部有更多空间
+    // const priceMax = maxPrice * 1.1;
+
+    const timestamps = chartData.map((d) => d.timestamp);
     const minTime = Math.min(...timestamps);
     const maxTime = Math.max(...timestamps);
     const timeRange = maxTime - minTime || 1;
 
     // 生成坐标点
     const points = chartData.map((point) => {
-      const x = padding.left + (point.timestamp - minTime) / timeRange * chartWidth;
+      const x =
+        padding.left + ((point.timestamp - minTime) / timeRange) * chartWidth;
       let y: number;
       if (point.price === 0) {
         y = padding.top + chartHeight;
       } else {
-        y = padding.top + chartHeight - ((point.price - priceMin) / (priceMax - priceMin)) * chartHeight;
+        y =
+          padding.top +
+          chartHeight -
+          ((point.price - priceMin) / (priceMax - priceMin)) * chartHeight;
       }
       return { x, y, ...point };
     });
 
     // 生成平滑曲线路径 (Catmull-Rom spline 或 简单的 Bezier)
     // 这里使用简单的三次贝塞尔曲线连接
-    const generateSmoothPath = (pts: Array<ChartDataPoint & { x: number; y: number }>) => {
-      if (pts.length === 0) return '';
+    const generateSmoothPath = (
+      pts: Array<ChartDataPoint & { x: number; y: number }>,
+    ) => {
+      if (pts.length === 0) return "";
       if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`;
 
       let path = `M ${pts[0].x} ${pts[0].y}`;
@@ -218,7 +246,9 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
     // 标签处理
     const labelCount = Math.min(5, points.length);
     const labelStep = Math.floor(points.length / labelCount);
-    const labelPoints = points.filter((_, index) => index % labelStep === 0 || index === points.length - 1);
+    const labelPoints = points.filter(
+      (_, index) => index % labelStep === 0 || index === points.length - 1,
+    );
 
     const highestPrice = validPrices.length > 0 ? Math.max(...validPrices) : 0;
     const lowestPrice = validPrices.length > 0 ? Math.min(...validPrices) : 0;
@@ -241,7 +271,7 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
   }, [chartData]);
 
   return (
-    <div className={`space-y-3 ${className || ''}`}>
+    <div className={`space-y-3 ${className || ""}`}>
       {/* 时间范围选择器 */}
       <div className="flex items-center justify-between">
         <div className="text-slate-900 dark:text-white text-base font-bold">
@@ -249,22 +279,34 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setTimeRange('24h')}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${timeRange === '24h'
-              ? 'bg-yellow-500 dark:bg-yellow-600 text-white'
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-              }`}
+            onClick={() => setTimeRange("24h")}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              timeRange === "24h"
+                ? "bg-yellow-500 dark:bg-yellow-600 text-white"
+                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+            }`}
           >
             24小时
           </button>
           <button
-            onClick={() => setTimeRange('30d')}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${timeRange === '30d'
-              ? 'bg-yellow-500 dark:bg-yellow-600 text-white'
-              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-              }`}
+            onClick={() => setTimeRange("30d")}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              timeRange === "30d"
+                ? "bg-yellow-500 dark:bg-yellow-600 text-white"
+                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+            }`}
           >
             30天
+          </button>
+          <button
+            onClick={() => setTimeRange("1y")}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              timeRange === "1y"
+                ? "bg-yellow-500 dark:bg-yellow-600 text-white"
+                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+            }`}
+          >
+            一年
           </button>
         </div>
       </div>
@@ -273,11 +315,15 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
       <div className="rounded-2xl bg-surface-darker border border-[rgba(167,125,47,0.12)] overflow-hidden shadow-sm p-4">
         {isLoading ? (
           <div className="flex items-center justify-center h-[180px]">
-            <div className="text-slate-500 dark:text-slate-400 text-sm">加载中...</div>
+            <div className="text-slate-500 dark:text-slate-400 text-sm">
+              加载中...
+            </div>
           </div>
         ) : error ? (
           <div className="flex items-center justify-center h-[180px]">
-            <div className="text-red-500 dark:text-red-400 text-sm">{error}</div>
+            <div className="text-red-500 dark:text-red-400 text-sm">
+              {error}
+            </div>
           </div>
         ) : chartConfig && chartData.length > 0 ? (
           <div className="relative">
@@ -285,13 +331,17 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
             <div className="flex items-center justify-between mb-2 px-1">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-1.5">
-                  <div className="text-slate-500 dark:text-slate-400 text-xs">最高</div>
+                  <div className="text-slate-500 dark:text-slate-400 text-xs">
+                    最高
+                  </div>
                   <div className="text-emerald-500 dark:text-emerald-400 text-sm font-bold">
                     ¥{formatNumber(chartConfig.highestPrice, 2)}
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="text-slate-500 dark:text-slate-400 text-xs">最低</div>
+                  <div className="text-slate-500 dark:text-slate-400 text-xs">
+                    最低
+                  </div>
                   <div className="text-red-500 dark:text-red-400 text-sm font-bold">
                     ¥{formatNumber(chartConfig.lowestPrice, 2)}
                   </div>
@@ -307,22 +357,37 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
             >
               {/* 渐变定义 */}
               <defs>
-                <linearGradient id="goldGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="rgb(234, 179, 8)" stopOpacity="0.3" />
-                  <stop offset="100%" stopColor="rgb(234, 179, 8)" stopOpacity="0.05" />
+                <linearGradient
+                  id="goldGradient"
+                  x1="0%"
+                  y1="0%"
+                  x2="0%"
+                  y2="100%"
+                >
+                  <stop
+                    offset="0%"
+                    stopColor="rgb(234, 179, 8)"
+                    stopOpacity="0.3"
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor="rgb(234, 179, 8)"
+                    stopOpacity="0.05"
+                  />
                 </linearGradient>
               </defs>
 
               {/* 背景区域填充 */}
-              <path
-                d={chartConfig.areaPath}
-                fill="url(#goldGradient)"
-              />
+              <path d={chartConfig.areaPath} fill="url(#goldGradient)" />
 
               {/* 网格线 */}
               {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-                const y = chartConfig.padding.top + chartConfig.chartHeight * (1 - ratio);
-                const price = chartConfig.priceMin + (chartConfig.priceMax - chartConfig.priceMin) * ratio;
+                const y =
+                  chartConfig.padding.top +
+                  chartConfig.chartHeight * (1 - ratio);
+                const price =
+                  chartConfig.priceMin +
+                  (chartConfig.priceMax - chartConfig.priceMin) * ratio;
                 return (
                   <g key={ratio}>
                     <line
@@ -357,8 +422,12 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                strokeDasharray={chartConfig.points.some(p => p.price === 0) ? "4,2" : "none"}
-                opacity={chartConfig.points.some(p => p.price === 0) ? 0.5 : 1}
+                strokeDasharray={
+                  chartConfig.points.some((p) => p.price === 0) ? "4,2" : "none"
+                }
+                opacity={
+                  chartConfig.points.some((p) => p.price === 0) ? 0.5 : 1
+                }
               />
 
               {/* X 轴标签 */}
@@ -413,7 +482,11 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
                   {/* Price Text */}
                   <text
                     x={selectedPoint.x}
-                    y={selectedPoint.y - 12 < chartConfig.padding.top ? selectedPoint.y + 24 : selectedPoint.y - 12}
+                    y={
+                      selectedPoint.y - 12 < chartConfig.padding.top
+                        ? selectedPoint.y + 24
+                        : selectedPoint.y - 12
+                    }
                     textAnchor="middle"
                     fontSize="12"
                     fontWeight="bold"
@@ -426,12 +499,24 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
 
               {/* Interaction Layer */}
               {chartConfig.points.map((point, index) => {
-                const prevX = index > 0 ? chartConfig.points[index - 1].x : chartConfig.padding.left;
-                const nextX = index < chartConfig.points.length - 1 ? chartConfig.points[index + 1].x : chartConfig.width - chartConfig.padding.right;
+                const prevX =
+                  index > 0
+                    ? chartConfig.points[index - 1].x
+                    : chartConfig.padding.left;
+                const nextX =
+                  index < chartConfig.points.length - 1
+                    ? chartConfig.points[index + 1].x
+                    : chartConfig.width - chartConfig.padding.right;
 
                 // Calculate boundary for this click zone
-                const startX = index === 0 ? chartConfig.padding.left : (prevX + point.x) / 2;
-                const endX = index === chartConfig.points.length - 1 ? chartConfig.width - chartConfig.padding.right : (point.x + nextX) / 2;
+                const startX =
+                  index === 0
+                    ? chartConfig.padding.left
+                    : (prevX + point.x) / 2;
+                const endX =
+                  index === chartConfig.points.length - 1
+                    ? chartConfig.width - chartConfig.padding.right
+                    : (point.x + nextX) / 2;
 
                 return (
                   <rect
@@ -450,7 +535,9 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className }) => {
           </div>
         ) : (
           <div className="flex items-center justify-center h-[180px]">
-            <div className="text-slate-500 dark:text-slate-400 text-sm">暂无数据</div>
+            <div className="text-slate-500 dark:text-slate-400 text-sm">
+              暂无数据
+            </div>
           </div>
         )}
       </div>
