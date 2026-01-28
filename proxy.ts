@@ -1,19 +1,38 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
+  let supabaseResponse = NextResponse.next({
+    request,
+  });
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => {
+            // Update request cookies so downstream components can access them
+            request.cookies.set(name, value);
+          });
+          // Recreate the response with the updated request
+          supabaseResponse = NextResponse.next({
+            request,
+          });
+          // Set cookies on the response for the browser
+          cookiesToSet.forEach(({ name, value, options }) => {
+            supabaseResponse.cookies.set(name, value, options);
+          });
         },
       },
     }
   );
 
+  // This will refresh the session if it's expired - required for Server Components
   const { data } = await supabase.auth.getUser();
   const { pathname } = request.nextUrl;
 
@@ -24,7 +43,7 @@ export async function middleware(request: NextRequest) {
     if (data.user && pathname.startsWith('/login')) {
       return NextResponse.redirect(new URL('/', request.url));
     }
-    return NextResponse.next();
+    return supabaseResponse;
   }
 
   if (!data.user) {
@@ -33,7 +52,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  return NextResponse.next();
+  return supabaseResponse;
 }
 
 export const config = {

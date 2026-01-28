@@ -17,39 +17,40 @@ interface GoldDetailPageProps {
   asset: Asset;
 }
 
-const GoldDetailPage: React.FC<GoldDetailPageProps> = ({
-  asset,
-}) => {
+const GoldDetailPage: React.FC<GoldDetailPageProps> = ({ asset }) => {
   // State definitions
-  const [data24h, setData24h] = useState<MarketDataHourlyHistoryResponse | null>(null);
+  const [data24h, setData24h] =
+    useState<MarketDataHourlyHistoryResponse | null>(null);
   const [data7d, setData7d] = useState<MarketDataHistoryResponse | null>(null);
-  const [purchaseRecords, setPurchaseRecords] = useState<GoldPurchaseRecord[]>([]);
+  const [purchaseRecords, setPurchaseRecords] = useState<GoldPurchaseRecord[]>(
+    [],
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async (signal?: AbortSignal) => {
-      setLoading(true);
-      setError(null);
+    setLoading(true);
+    setError(null);
 
-      try {
-        const [res24h, res7d, records] = await Promise.all([
-          fetchMarketDataHistory({ hours: 24 }, signal),
-          fetchMarketDataHistory({ days: 7 }, signal),
-          getGoldPurchases(signal),
-        ]);
+    try {
+      const [res24h, res7d, records] = await Promise.all([
+        fetchMarketDataHistory({ hours: 24 }, signal),
+        fetchMarketDataHistory({ days: 7 }, signal),
+        getGoldPurchases(signal),
+      ]);
 
-        setData24h(res24h as unknown as MarketDataHourlyHistoryResponse);
-        setData7d(res7d);
-        setPurchaseRecords(records);
-      } catch (err) {
-        if (err instanceof Error && err.name !== 'AbortError') {
-          console.error('获取数据失败:', err);
-          setError('数据加载失败');
-        }
-        throw err;
-      } finally {
-         setLoading(false);
+      setData24h(res24h as unknown as MarketDataHourlyHistoryResponse);
+      setData7d(res7d);
+      setPurchaseRecords(records);
+    } catch (err) {
+      if (err instanceof Error && err.name !== "AbortError") {
+        console.error("获取数据失败:", err);
+        setError("数据加载失败");
       }
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   // Consolidated data fetching
@@ -88,7 +89,7 @@ const GoldDetailPage: React.FC<GoldDetailPageProps> = ({
       const records = await getGoldPurchases();
       setPurchaseRecords(records);
     } catch (err) {
-      console.error('刷新购买记录失败:', err);
+      console.error("刷新购买记录失败:", err);
     }
   }, []);
 
@@ -109,119 +110,119 @@ const GoldDetailPage: React.FC<GoldDetailPageProps> = ({
 
   return (
     <PWAPullToRefresh onRefresh={() => fetchData()}>
-    <div className="space-y-4 -mt-2">
-      {/* Top Section: Price and Profit/Loss */}
-      <div
-        className="rounded-2xl bg-surface-darker border border-[rgba(167,125,47,0.12)] overflow-hidden shadow-sm"
-        style={{
-          borderRadius: "32px",
-        }}
-      >
-        {/* Current Price Area */}
-        <div className="px-5 pt-5 pb-4 bg-gradient-to-b from-yellow-50/30 dark:from-yellow-900/10 to-transparent">
-          <div className="mb-3">
-            <div className="text-yellow-500 dark:text-yellow-400 text-4xl font-extrabold tracking-tight mb-0.5">
-              {currentPrice > 0 ? (
-                formatNumber(currentPrice, 2)
-              ) : (
-                <span className="inline-block w-32 h-10 bg-yellow-200 dark:bg-yellow-800 rounded animate-pulse" />
-              )}
+      <div className="space-y-4 -mt-2">
+        {/* Top Section: Price and Profit/Loss */}
+        <div
+          className="rounded-2xl bg-surface-darker border border-[rgba(167,125,47,0.12)] overflow-hidden shadow-sm"
+          style={{
+            borderRadius: "32px",
+          }}
+        >
+          {/* Current Price Area */}
+          <div className="px-5 pt-5 pb-4 bg-gradient-to-b from-yellow-50/30 dark:from-yellow-900/10 to-transparent">
+            <div className="mb-3">
+              <div className="text-yellow-500 dark:text-yellow-400 text-4xl font-extrabold tracking-tight mb-0.5">
+                {currentPrice > 0 ? (
+                  formatNumber(currentPrice, 2)
+                ) : (
+                  <span className="inline-block w-32 h-10 bg-yellow-200 dark:bg-yellow-800 rounded animate-pulse" />
+                )}
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="text-slate-500 dark:text-slate-300 text-xs font-medium">
+                  当前金价 (AU9999)
+                </div>
+                <div
+                  className={`text-sm font-bold ${
+                    todayChangePercent >= 0
+                      ? "text-emerald-500 dark:text-emerald-400"
+                      : "text-red-500 dark:text-red-400"
+                  }`}
+                >
+                  {todayChangePercent >= 0 ? "+" : ""}
+                  {formatNumber(todayChangePercent, 2)}% 今日
+                </div>
+              </div>
             </div>
-            <div className="flex items-center justify-between">
+
+            {/* Cumulative Profit/Loss */}
+            <div className="pt-3">
+              <div className="text-emerald-500 dark:text-emerald-400 text-2xl font-extrabold tracking-tight mb-0.5">
+                {loading
+                  ? "..."
+                  : `${profitLoss >= 0 ? "+" : ""}¥${formatNumber(profitLoss, 2)}`}
+              </div>
               <div className="text-slate-500 dark:text-slate-300 text-xs font-medium">
-                当前金价 (AU9999)
-              </div>
-              <div
-                className={`text-sm font-bold ${
-                  todayChangePercent >= 0
-                    ? "text-emerald-500 dark:text-emerald-400"
-                    : "text-red-500 dark:text-red-400"
-                }`}
-              >
-                {todayChangePercent >= 0 ? "+" : ""}
-                {formatNumber(todayChangePercent, 2)}% 今日
+                累计持有盈亏
               </div>
             </div>
           </div>
 
-          {/* Cumulative Profit/Loss */}
-          <div className="pt-3">
-            <div className="text-emerald-500 dark:text-emerald-400 text-2xl font-extrabold tracking-tight mb-0.5">
-              {loading
-                ? "..."
-                : `${profitLoss >= 0 ? "+" : ""}¥${formatNumber(profitLoss, 0)}`}
+          {/* Holdings Info */}
+          <div className="px-5 py-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-slate-500 dark:text-slate-400 text-[10px] font-medium mb-1 uppercase tracking-wide">
+                  持仓克数
+                </div>
+                <div className="text-slate-900 dark:text-white text-base font-bold">
+                  {loading ? "..." : formatNumber(totalWeight, 2)}g
+                </div>
+              </div>
+              <div>
+                <div className="text-slate-500 dark:text-slate-400 text-[10px] font-medium mb-1 uppercase tracking-wide">
+                  持仓均价
+                </div>
+                <div className="text-slate-900 dark:text-white text-base font-bold">
+                  {loading ? "..." : formatNumber(averagePrice, 2)}元/克
+                </div>
+              </div>
             </div>
-            <div className="text-slate-500 dark:text-slate-300 text-xs font-medium">
-              累计持有盈亏
+          </div>
+
+          {/* Investment and Market Value */}
+          <div className="px-5 py-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-slate-500 dark:text-slate-400 text-[10px] font-medium mb-1 uppercase tracking-wide">
+                  总投资成本
+                </div>
+                <div className="text-slate-900 dark:text-white text-base font-bold">
+                  {loading ? "..." : `¥${formatNumber(totalInvestment, 2)}`}
+                </div>
+              </div>
+              <div>
+                <div className="text-slate-500 dark:text-slate-400 text-[10px] font-medium mb-1 uppercase tracking-wide">
+                  当前总市值
+                </div>
+                <div className="text-slate-900 dark:text-white text-base font-bold">
+                  {loading ? "..." : `¥${formatNumber(currentMarketValue, 2)}`}
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Holdings Info */}
-        <div className="px-5 py-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <div className="text-slate-500 dark:text-slate-400 text-[10px] font-medium mb-1 uppercase tracking-wide">
-                持仓克数
-              </div>
-              <div className="text-slate-900 dark:text-white text-base font-bold">
-                {loading ? "..." : formatNumber(totalWeight, 2)}g
-              </div>
-            </div>
-            <div>
-              <div className="text-slate-500 dark:text-slate-400 text-[10px] font-medium mb-1 uppercase tracking-wide">
-                持仓均价
-              </div>
-              <div className="text-slate-900 dark:text-white text-base font-bold">
-                {loading ? "..." : formatNumber(averagePrice, 2)}元/克
-              </div>
+        {/* Price Chart */}
+        {loading ? (
+          <div className="rounded-2xl bg-surface-darker border border-[rgba(167,125,47,0.12)] overflow-hidden shadow-sm p-4 h-[250px] flex items-center justify-center">
+            <div className="text-slate-500 dark:text-slate-400 text-sm animate-pulse">
+              加载图表数据...
             </div>
           </div>
-        </div>
+        ) : (
+          <GoldPriceChart initialData24h={data24h} />
+        )}
 
-        {/* Investment and Market Value */}
-        <div className="px-5 py-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <div className="text-slate-500 dark:text-slate-400 text-[10px] font-medium mb-1 uppercase tracking-wide">
-                总投资成本
-              </div>
-              <div className="text-slate-900 dark:text-white text-base font-bold">
-                {loading ? "..." : `¥${formatNumber(totalInvestment, 0)}`}
-              </div>
-            </div>
-            <div>
-              <div className="text-slate-500 dark:text-slate-400 text-[10px] font-medium mb-1 uppercase tracking-wide">
-                当前总市值
-              </div>
-              <div className="text-slate-900 dark:text-white text-base font-bold">
-                {loading ? "..." : `¥${formatNumber(currentMarketValue, 0)}`}
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Purchase Records */}
+        <GoldPurchaseRecords
+          asset={asset}
+          currentGoldPrice={currentPrice}
+          records={purchaseRecords}
+          loading={loading}
+          onRefresh={fetchRecords}
+        />
       </div>
-
-      {/* Price Chart */}
-      {loading ? (
-        <div className="rounded-2xl bg-surface-darker border border-[rgba(167,125,47,0.12)] overflow-hidden shadow-sm p-4 h-[250px] flex items-center justify-center">
-          <div className="text-slate-500 dark:text-slate-400 text-sm animate-pulse">
-            加载图表数据...
-          </div>
-        </div>
-      ) : (
-        <GoldPriceChart initialData24h={data24h} />
-      )}
-
-      {/* Purchase Records */}
-      <GoldPurchaseRecords
-        asset={asset}
-        currentGoldPrice={currentPrice}
-        records={purchaseRecords}
-        loading={loading}
-        onRefresh={fetchRecords}
-      />
-    </div>
     </PWAPullToRefresh>
   );
 };
