@@ -128,6 +128,49 @@ function Dashboard() {
     }
   }, []);
 
+  const handlePWARefresh = useCallback(async () => {
+    setIsPortfolioLoading(true);
+
+    try {
+      // 第一步：先调用 fetchMarketDataHistory
+      await fetchMarketDataHistory({ days: 7 })
+        .then(data => {
+          setMarketData(data);
+        })
+        .catch(error => {
+          console.error('获取市场数据失败:', error);
+          setMarketData({ gold_price: {}, exchange_rate: {} });
+        });
+
+      // 第二步：调用结束后，同时调用 fetchPortfolioAll 和 fetchMarketDataHistory
+      await Promise.allSettled([
+        fetchPortfolioAll()
+          .then(data => {
+            setPortfolio(data);
+          })
+          .catch(error => {
+            console.error('获取资产组合数据失败:', error);
+            setPortfolio({
+              'gold-purchases': {},
+              'debt-records': {},
+              'usd-purchases': {},
+              'rmb-deposits': {},
+            });
+          }),
+        fetchMarketDataHistory({ days: 7 })
+          .then(data => {
+            setMarketData(data);
+          })
+          .catch(error => {
+            console.error('获取市场数据失败:', error);
+            setMarketData({ gold_price: {}, exchange_rate: {} });
+          }),
+      ]);
+    } finally {
+      setIsPortfolioLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     // 仅在资产列表视图且当前标签为 assets 时获取数据
     if (currentTab !== 'assets' || assetView !== 'list') return;
@@ -242,7 +285,7 @@ function Dashboard() {
             ) : assetView === 'debt-detail' && selectedDebtAsset ? (
               <DebtDetailPage asset={selectedDebtAsset} />
             ) : (
-              <PWAPullToRefresh onRefresh={() => fetchDashboardData()}>
+              <PWAPullToRefresh onRefresh={() => handlePWARefresh()}>
                 <AssetOverview assets={assets} isLoading={isPortfolioLoading} />
                 <AssetList
                   assets={assets}
