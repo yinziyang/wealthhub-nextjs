@@ -3,6 +3,7 @@
 import React from 'react';
 import { Bell, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePWA } from '@/hooks/usePWA';
 
 interface HeaderProps {
   currentTab: 'assets' | 'profile';
@@ -12,9 +13,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ currentTab, assetView = 'list', onBack }) => {
   const { user, profile } = useAuth();
-
-  const isPWA = window.matchMedia('(display-mode: standalone)').matches ||
-               (window.navigator as any).standalone === true;
+  const isPWA = usePWA();
 
   const displayName = profile?.full_name || user?.email || '用户';
   const initialLetter = profile?.full_name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || '?';

@@ -8,6 +8,7 @@ import { fetchMarketDataHistory } from "@/lib/api/market-data";
 import { getUsdPurchases } from "@/lib/api/usd-purchases";
 import UsdExchangeRateChart from "@/components/UsdExchangeRateChart";
 import UsdPurchaseRecords from "@/components/UsdPurchaseRecords";
+import PWAPullToRefresh from "@/components/PWAPullToRefresh";
 
 interface UsdDetailPageProps {
   asset: Asset;
@@ -21,43 +22,37 @@ const UsdDetailPage: React.FC<UsdDetailPageProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let isCancelled = false;
-    const controller = new AbortController();
-
-    async function fetchAllData() {
+  const fetchData = useCallback(async (signal?: AbortSignal) => {
       setLoading(true);
       setError(null);
 
       try {
         const [marketData, records] = await Promise.all([
-          fetchMarketDataHistory({ days: 30 }, controller.signal),
-          getUsdPurchases(controller.signal),
+          fetchMarketDataHistory({ days: 30 }, signal),
+          getUsdPurchases(signal),
         ]);
-
-        if (isCancelled) return;
 
         setData30d(marketData);
         setPurchaseRecords(records);
       } catch (err) {
-        if (!isCancelled && err instanceof Error && err.name !== 'AbortError') {
+        if (err instanceof Error && err.name !== 'AbortError') {
           console.error('获取数据失败:', err);
           setError('数据加载失败');
         }
+        throw err;
       } finally {
-        if (!isCancelled) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
-    }
+  }, []);
 
-    fetchAllData();
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchData(controller.signal).catch(() => {});
 
     return () => {
-      isCancelled = true;
       controller.abort();
     };
-  }, []);
+  }, [fetchData]);
 
   // Calculate current exchange rate and change
   const currentExchangeRate = useMemo(() => {
@@ -107,6 +102,7 @@ const UsdDetailPage: React.FC<UsdDetailPageProps> = ({
   const profitLoss = currentTotalValue - totalInvestment;
 
   return (
+    <PWAPullToRefresh onRefresh={() => fetchData()}>
     <div className="space-y-4 -mt-2">
       <div
         className="rounded-2xl bg-surface-darker border border-[rgba(34,197,94,0.12)] overflow-hidden shadow-sm"
@@ -214,6 +210,7 @@ const UsdDetailPage: React.FC<UsdDetailPageProps> = ({
         onRefresh={fetchRecords}
       />
     </div>
+    </PWAPullToRefresh>
   );
 };
 

@@ -11,6 +11,7 @@ import { fetchMarketDataHistory } from "@/lib/api/market-data";
 import { getGoldPurchases } from "@/lib/api/gold-purchases";
 import GoldPriceChart from "@/components/GoldPriceChart";
 import GoldPurchaseRecords from "@/components/GoldPurchaseRecords";
+import PWAPullToRefresh from "@/components/PWAPullToRefresh";
 
 interface GoldDetailPageProps {
   asset: Asset;
@@ -26,56 +27,40 @@ const GoldDetailPage: React.FC<GoldDetailPageProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Consolidated data fetching
-  useEffect(() => {
-    let isCancelled = false;
-    const controller = new AbortController();
-
-    async function fetchAllData() {
+  const fetchData = useCallback(async (signal?: AbortSignal) => {
       setLoading(true);
       setError(null);
 
       try {
-        // Parallel requests
-        // Note: fetchMarketDataHistory is used for both requests because we're in the client
-        // and we want to reuse the typed wrapper.
-        // However, the wrapper currently returns MarketDataHistoryResponse (days) type primarily.
-        // We need to cast or handle the response types carefully if they differ significantly.
-        // The current implementation of fetchMarketDataHistory handles parameters correctly.
-        
         const [res24h, res7d, records] = await Promise.all([
-          fetchMarketDataHistory({ hours: 24 }, controller.signal),
-          fetchMarketDataHistory({ days: 7 }, controller.signal),
-          getGoldPurchases(controller.signal),
+          fetchMarketDataHistory({ hours: 24 }, signal),
+          fetchMarketDataHistory({ days: 7 }, signal),
+          getGoldPurchases(signal),
         ]);
 
-        if (isCancelled) return;
-
-        // Update state
-        // fetchMarketDataHistory returns the data directly or throws
-        setData24h(res24h as unknown as MarketDataHourlyHistoryResponse); // Type assertion might be needed if types aren't perfectly aligned
+        setData24h(res24h as unknown as MarketDataHourlyHistoryResponse);
         setData7d(res7d);
         setPurchaseRecords(records);
-        
       } catch (err) {
-        if (!isCancelled && err instanceof Error && err.name !== 'AbortError') {
+        if (err instanceof Error && err.name !== 'AbortError') {
           console.error('获取数据失败:', err);
           setError('数据加载失败');
         }
+        throw err;
       } finally {
-        if (!isCancelled) {
-          setLoading(false);
-        }
+         setLoading(false);
       }
-    }
+  }, []);
 
-    fetchAllData();
+  // Consolidated data fetching
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchData(controller.signal).catch(() => {}); // Catch to prevent unhandled rejection in useEffect
 
     return () => {
-      isCancelled = true;
       controller.abort();
     };
-  }, []);
+  }, [fetchData]);
 
   // Calculate current price and change
   const currentPrice = useMemo(() => {
@@ -123,6 +108,7 @@ const GoldDetailPage: React.FC<GoldDetailPageProps> = ({
   const profitLoss = currentMarketValue - totalInvestment;
 
   return (
+    <PWAPullToRefresh onRefresh={() => fetchData()}>
     <div className="space-y-4 -mt-2">
       {/* Top Section: Price and Profit/Loss */}
       <div
@@ -236,6 +222,7 @@ const GoldDetailPage: React.FC<GoldDetailPageProps> = ({
         onRefresh={fetchRecords}
       />
     </div>
+    </PWAPullToRefresh>
   );
 };
 

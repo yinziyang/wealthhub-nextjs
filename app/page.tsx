@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import Header from '@/components/Header';
 import AssetOverview from '@/components/AssetOverview';
@@ -13,6 +13,7 @@ import UsdDetailPage from '@/components/UsdDetailPage';
 import RmbDetailPage from '@/components/RmbDetailPage';
 import DebtDetailPage from '@/components/DebtDetailPage';
 import AuthGuard from '@/components/AuthGuard';
+import PWAPullToRefresh from '@/components/PWAPullToRefresh';
 import { Asset, PortfolioAllResponse } from '@/types';
 import { createAssetObject, getLatestValue } from '@/utils';
 import { fetchPortfolioAll } from '@/lib/api/portfolio';
@@ -79,27 +80,22 @@ function Dashboard() {
     ];
   };
 
-  useEffect(() => {
-    // 仅在资产列表视图且当前标签为 assets 时获取数据
-    if (currentTab !== 'assets' || assetView !== 'list') return;
+  const fetchDashboardData = useCallback(async (signal?: AbortSignal) => {
+    // 启动加载状态
+    setIsPortfolioLoading(true);
 
-    let isCancelled = false;
-    const controller = new AbortController();
-
-    const fetchDashboardData = async () => {
-      // 启动加载状态
-      setIsPortfolioLoading(true);
-
+    try {
       // 1. 获取资产组合数据 (控制骨架屏)
-      fetchPortfolioAll(controller.signal)
+      // 使用 Promise.allSettled 或者分开处理，确保一个失败不影响另一个
+      // 这里保持原有逻辑分开处理，但放在同一个 async 函数中
+
+      const portfolioPromise = fetchPortfolioAll(signal)
         .then(data => {
-          if (!isCancelled) {
             setPortfolio(data);
-            setIsPortfolioLoading(false); // 资产数据返回，骨架屏消失
-          }
+            return data;
         })
         .catch(error => {
-          if (!isCancelled && error.name !== 'AbortError') {
+          if (error.name !== 'AbortError') {
             console.error('获取资产组合数据失败:', error);
             // 失败也需要关闭 loading，显示空状态或错误提示
             setPortfolio({
@@ -108,32 +104,41 @@ function Dashboard() {
               'usd-purchases': {},
               'rmb-deposits': {},
             });
-            setIsPortfolioLoading(false);
           }
+          throw error;
         });
 
-      // 2. 并发获取市场数据 (不阻塞 UI，独立更新)
-      fetchMarketDataHistory({ days: 7 }, controller.signal)
+      // 2. 并发获取市场数据
+      const marketDataPromise = fetchMarketDataHistory({ days: 7 }, signal)
         .then(data => {
-          if (!isCancelled) {
             setMarketData(data);
-          }
+            return data;
         })
         .catch(error => {
-          if (!isCancelled && error.name !== 'AbortError') {
-            console.error('获取市场数据失败:', error);
-            setMarketData({ gold_price: {}, exchange_rate: {} });
+          if (error.name !== 'AbortError') {
+             console.error('获取市场数据失败:', error);
+             setMarketData({ gold_price: {}, exchange_rate: {} });
           }
+          throw error;
         });
-    };
 
-    fetchDashboardData();
+      await Promise.allSettled([portfolioPromise, marketDataPromise]);
+    } finally {
+        setIsPortfolioLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // 仅在资产列表视图且当前标签为 assets 时获取数据
+    if (currentTab !== 'assets' || assetView !== 'list') return;
+
+    const controller = new AbortController();
+    fetchDashboardData(controller.signal);
 
     return () => {
-      isCancelled = true;
       controller.abort();
     };
-  }, [currentTab, assetView]); // 依赖 assetView 以确保从详情页返回时刷新
+  }, [currentTab, assetView, fetchDashboardData]); // 依赖 assetView 以确保从详情页返回时刷新
 
   useEffect(() => {
     if (portfolio) {
@@ -237,7 +242,7 @@ function Dashboard() {
             ) : assetView === 'debt-detail' && selectedDebtAsset ? (
               <DebtDetailPage asset={selectedDebtAsset} />
             ) : (
-              <>
+              <PWAPullToRefresh onRefresh={() => fetchDashboardData()}>
                 <AssetOverview assets={assets} isLoading={isPortfolioLoading} />
                 <AssetList
                   assets={assets}
@@ -245,7 +250,7 @@ function Dashboard() {
                   isLoading={isPortfolioLoading}
                   onAssetClick={handleAssetClick}
                 />
-              </>
+              </PWAPullToRefresh>
             )
           ) : (
             <ProfilePage />

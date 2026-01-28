@@ -5,6 +5,7 @@ import { Asset, DebtRecord } from '@/types';
 import { formatNumber } from '@/utils';
 import { getDebtRecords } from '@/lib/api/debt-records';
 import DebtRecordList from '@/components/DebtRecordList';
+import PWAPullToRefresh from "@/components/PWAPullToRefresh";
 
 interface DebtDetailPageProps {
   asset: Asset;
@@ -15,40 +16,33 @@ const DebtDetailPage: React.FC<DebtDetailPageProps> = ({ asset }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Consolidated data fetching
-  useEffect(() => {
-    let isCancelled = false;
-    const controller = new AbortController();
-
-    async function fetchData() {
+  const fetchData = useCallback(async (signal?: AbortSignal) => {
       setLoading(true);
       setError(null);
 
       try {
-        const data = await getDebtRecords(controller.signal);
-
-        if (isCancelled) return;
-
+        const data = await getDebtRecords(signal);
         setRecords(data);
       } catch (err) {
-        if (!isCancelled && err instanceof Error && err.name !== 'AbortError') {
+        if (err instanceof Error && err.name !== 'AbortError') {
           console.error('获取债权记录失败:', err);
           setError('数据加载失败');
         }
+        throw err;
       } finally {
-        if (!isCancelled) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
-    }
+  }, []);
 
-    fetchData();
+  // Consolidated data fetching
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchData(controller.signal).catch(() => {});
 
     return () => {
-      isCancelled = true;
       controller.abort();
     };
-  }, []);
+  }, [fetchData]);
 
   // Calculate total debt
   const totalDebt = useMemo(() => {
@@ -75,6 +69,7 @@ const DebtDetailPage: React.FC<DebtDetailPageProps> = ({ asset }) => {
   }, []);
 
   return (
+    <PWAPullToRefresh onRefresh={() => fetchData()}>
     <div className="space-y-4 -mt-2">
       <div
         className="rounded-2xl bg-surface-darker border border-[rgba(245,158,11,0.12)] overflow-hidden shadow-sm"
@@ -125,6 +120,7 @@ const DebtDetailPage: React.FC<DebtDetailPageProps> = ({ asset }) => {
 
       <DebtRecordList records={records} loading={loading} error={error} onRefresh={fetchRecords} />
     </div>
+    </PWAPullToRefresh>
   );
 };
 

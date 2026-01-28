@@ -6,6 +6,7 @@ import { formatNumber } from '@/utils';
 import { getRmbDeposits } from '@/lib/api/rmb-deposits';
 import RmbDepositChart from '@/components/RmbDepositChart';
 import RmbDepositRecords from '@/components/RmbDepositRecords';
+import PWAPullToRefresh from "@/components/PWAPullToRefresh";
 
 interface RmbDetailPageProps {
   asset: Asset;
@@ -27,40 +28,33 @@ const RmbDetailPage: React.FC<RmbDetailPageProps> = ({ asset }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Consolidated data fetching
-  useEffect(() => {
-    let isCancelled = false;
-    const controller = new AbortController();
-
-    async function fetchData() {
+  const fetchData = useCallback(async (signal?: AbortSignal) => {
       setLoading(true);
       setError(null);
 
       try {
-        const data = await getRmbDeposits(controller.signal);
-
-        if (isCancelled) return;
-
+        const data = await getRmbDeposits(signal);
         setRecords(data);
       } catch (err) {
-        if (!isCancelled && err instanceof Error && err.name !== 'AbortError') {
+        if (err instanceof Error && err.name !== 'AbortError') {
           console.error('获取人民币存款记录失败:', err);
           setError('数据加载失败');
         }
+        throw err;
       } finally {
-        if (!isCancelled) {
-          setLoading(false);
-        }
+        setLoading(false);
       }
-    }
+  }, []);
 
-    fetchData();
+  // Consolidated data fetching
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchData(controller.signal).catch(() => {});
 
     return () => {
-      isCancelled = true;
       controller.abort();
     };
-  }, []);
+  }, [fetchData]);
 
   // Calculate statistics
   const totalDeposit = useMemo(() => {
@@ -118,6 +112,7 @@ const RmbDetailPage: React.FC<RmbDetailPageProps> = ({ asset }) => {
   }, []);
 
   return (
+    <PWAPullToRefresh onRefresh={() => fetchData()}>
     <div className="space-y-4 -mt-2">
       <div
         className="rounded-2xl bg-surface-darker border border-[rgba(59,130,246,0.12)] overflow-hidden shadow-sm"
@@ -170,6 +165,7 @@ const RmbDetailPage: React.FC<RmbDetailPageProps> = ({ asset }) => {
 
       <RmbDepositRecords records={records} loading={loading} error={error} onRefresh={fetchRecords} />
     </div>
+    </PWAPullToRefresh>
   );
 };
 
