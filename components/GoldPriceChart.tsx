@@ -6,6 +6,7 @@ import type {
   MarketDataHistoryResponse,
   MarketDataHourlyHistoryResponse,
 } from "@/lib/api-response";
+import { fetchMarketDataHistory } from "@/lib/api/market-data";
 
 type TimeRange = "24h" | "30d" | "1y";
 
@@ -47,33 +48,25 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className, initialData2
       }
 
       try {
-        let url: string;
+        let params: { days?: number; hours?: number } = {};
         if (timeRange === "24h") {
-          url = "/api/market-data/history?hours=24";
+          params = { hours: 24 };
         } else if (timeRange === "30d") {
-          url = "/api/market-data/history?days=30";
+          params = { days: 30 };
         } else {
-          url = "/api/market-data/history?days=365";
+          params = { days: 365 };
         }
 
-        const response = await fetch(url, {
-          signal: controller.signal,
-        });
-
-        const result = await response.json();
+        const result = await fetchMarketDataHistory(params, controller.signal);
 
         if (!controller.signal.aborted) {
-          if (result.success) {
-            const data = parseMarketData(result.data, timeRange);
-            setChartData(data);
-          } else {
-            setError("获取数据失败");
-            setChartData([]);
-          }
+          // fetchMarketDataHistory returns the data directly or throws
+          const data = parseMarketData(result as unknown as MarketDataHourlyHistoryResponse, timeRange);
+          setChartData(data);
         }
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") return;
-        setError("网络错误");
+        setError("获取数据失败");
         setChartData([]);
       } finally {
         if (!controller.signal.aborted) {

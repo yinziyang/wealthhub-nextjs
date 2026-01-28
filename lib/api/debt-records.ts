@@ -21,8 +21,8 @@ interface ApiResponse<T> {
   };
 }
 
-export async function getDebtRecords(): Promise<DebtRecord[]> {
-  const response = await fetch('/api/debt-records');
+export async function getDebtRecords(signal?: AbortSignal): Promise<DebtRecord[]> {
+  const response = await fetch('/api/debt-records', { signal });
   const result: ApiResponse<DebtRecord[]> = await response.json();
 
   if (!result.success) {

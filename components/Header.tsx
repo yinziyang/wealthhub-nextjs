@@ -13,6 +13,9 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ currentTab, assetView = 'list', onBack }) => {
   const { user, profile } = useAuth();
 
+  const isPWA = window.matchMedia('(display-mode: standalone)').matches ||
+               (window.navigator as any).standalone === true;
+
   const displayName = profile?.full_name || user?.email || '用户';
   const initialLetter = profile?.full_name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || '?';
 
@@ -113,7 +116,7 @@ const Header: React.FC<HeaderProps> = ({ currentTab, assetView = 'list', onBack 
                   Private Client
                 </p>
                 <h2 className="text-slate-900 dark:text-white text-sm font-bold leading-tight">
-                  {displayName}
+                  {isPWA ? `${displayName} (PWA)` : displayName}
                 </h2>
               </div>
             </>

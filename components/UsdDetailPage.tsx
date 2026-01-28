@@ -4,6 +4,8 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Asset, UsdPurchaseRecord } from "@/types";
 import { formatNumber } from "@/utils";
 import type { MarketDataHistoryResponse } from "@/lib/api-response";
+import { fetchMarketDataHistory } from "@/lib/api/market-data";
+import { getUsdPurchases } from "@/lib/api/usd-purchases";
 import UsdExchangeRateChart from "@/components/UsdExchangeRateChart";
 import UsdPurchaseRecords from "@/components/UsdPurchaseRecords";
 
@@ -28,24 +30,15 @@ const UsdDetailPage: React.FC<UsdDetailPageProps> = ({
       setError(null);
 
       try {
-        const [resMarket, resRecords] = await Promise.all([
-          fetch('/api/market-data/history?days=30', { signal: controller.signal }),
-          fetch('/api/usd-purchases', { signal: controller.signal }),
-        ]);
-
-        const [jsonMarket, jsonRecords] = await Promise.all([
-          resMarket.json(),
-          resRecords.json(),
+        const [marketData, records] = await Promise.all([
+          fetchMarketDataHistory({ days: 30 }, controller.signal),
+          getUsdPurchases(controller.signal),
         ]);
 
         if (isCancelled) return;
 
-        if (jsonMarket.success) {
-          setData30d(jsonMarket.data);
-        }
-        if (jsonRecords.success) {
-          setPurchaseRecords(jsonRecords.data);
-        }
+        setData30d(marketData);
+        setPurchaseRecords(records);
       } catch (err) {
         if (!isCancelled && err instanceof Error && err.name !== 'AbortError') {
           console.error('获取数据失败:', err);
@@ -89,11 +82,8 @@ const UsdDetailPage: React.FC<UsdDetailPageProps> = ({
   // Refresh purchase records only
   const fetchRecords = useCallback(async () => {
     try {
-      const res = await fetch('/api/usd-purchases');
-      const json = await res.json();
-      if (json.success) {
-        setPurchaseRecords(json.data);
-      }
+      const records = await getUsdPurchases();
+      setPurchaseRecords(records);
     } catch (err) {
       console.error('刷新购汇记录失败:', err);
     }

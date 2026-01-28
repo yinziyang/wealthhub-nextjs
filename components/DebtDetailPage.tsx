@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Asset, DebtRecord } from '@/types';
 import { formatNumber } from '@/utils';
+import { getDebtRecords } from '@/lib/api/debt-records';
 import DebtRecordList from '@/components/DebtRecordList';
 
 interface DebtDetailPageProps {
@@ -24,16 +25,11 @@ const DebtDetailPage: React.FC<DebtDetailPageProps> = ({ asset }) => {
       setError(null);
 
       try {
-        const res = await fetch('/api/debt-records', { signal: controller.signal });
-        const json = await res.json();
+        const data = await getDebtRecords(controller.signal);
 
         if (isCancelled) return;
 
-        if (json.success) {
-          setRecords(json.data);
-        } else {
-          setError('获取数据失败');
-        }
+        setRecords(data);
       } catch (err) {
         if (!isCancelled && err instanceof Error && err.name !== 'AbortError') {
           console.error('获取债权记录失败:', err);
@@ -71,11 +67,8 @@ const DebtDetailPage: React.FC<DebtDetailPageProps> = ({ asset }) => {
   // Refresh records
   const fetchRecords = useCallback(async () => {
     try {
-      const res = await fetch('/api/debt-records');
-      const json = await res.json();
-      if (json.success) {
-        setRecords(json.data);
-      }
+      const data = await getDebtRecords();
+      setRecords(data);
     } catch (err) {
       console.error('刷新债权记录失败:', err);
     }

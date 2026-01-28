@@ -22,8 +22,8 @@ interface ApiResponse<T> {
   };
 }
 
-export async function getRmbDeposits(): Promise<RmbDepositRecord[]> {
-  const response = await fetch('/api/rmb-deposits');
+export async function getRmbDeposits(signal?: AbortSignal): Promise<RmbDepositRecord[]> {
+  const response = await fetch('/api/rmb-deposits', { signal });
   const result: ApiResponse<RmbDepositRecord[]> = await response.json();
 
   if (!result.success) {

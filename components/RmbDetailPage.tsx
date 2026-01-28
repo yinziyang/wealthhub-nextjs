@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Asset, RmbDepositRecord, RmbDepositChartItem } from '@/types';
 import { formatNumber } from '@/utils';
+import { getRmbDeposits } from '@/lib/api/rmb-deposits';
 import RmbDepositChart from '@/components/RmbDepositChart';
 import RmbDepositRecords from '@/components/RmbDepositRecords';
 
@@ -36,16 +37,11 @@ const RmbDetailPage: React.FC<RmbDetailPageProps> = ({ asset }) => {
       setError(null);
 
       try {
-        const res = await fetch('/api/rmb-deposits', { signal: controller.signal });
-        const json = await res.json();
+        const data = await getRmbDeposits(controller.signal);
 
         if (isCancelled) return;
 
-        if (json.success) {
-          setRecords(json.data);
-        } else {
-          setError('获取数据失败');
-        }
+        setRecords(data);
       } catch (err) {
         if (!isCancelled && err instanceof Error && err.name !== 'AbortError') {
           console.error('获取人民币存款记录失败:', err);
@@ -114,11 +110,8 @@ const RmbDetailPage: React.FC<RmbDetailPageProps> = ({ asset }) => {
   // Refresh records
   const fetchRecords = useCallback(async () => {
     try {
-      const res = await fetch('/api/rmb-deposits');
-      const json = await res.json();
-      if (json.success) {
-        setRecords(json.data);
-      }
+      const data = await getRmbDeposits();
+      setRecords(data);
     } catch (err) {
       console.error('刷新存款记录失败:', err);
     }

@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { GoldPurchaseRecord, UsdPurchaseRecord, DebtRecord, RmbDepositRecord } from '@/types';
 import { GoldPurchaseForm, UsdPurchaseForm, DebtRecordForm, RmbDepositForm } from './forms';
+import { fetchMarketDataHistory } from '@/lib/api/market-data';
+import { getLatestValue } from '@/utils';
 
 type RecordType = 'gold' | 'usd' | 'debt' | 'rmb';
 
@@ -45,26 +47,19 @@ const EditRecordModal: React.FC<EditRecordModalProps> = ({
 
   const fetchMarketData = async () => {
     try {
-      const response = await fetch('/api/market-data/history?days=7');
-      const result = await response.json();
+      const result = await fetchMarketDataHistory({ days: 7 });
 
-      if (result.success && result.data) {
-        if (result.data.gold_price) {
-          const goldPrices = result.data.gold_price;
-          const dates = Object.keys(goldPrices).sort().reverse();
-          if (dates.length > 0) {
-            const latestPrice = goldPrices[dates[0]];
-            setCurrentGoldPrice(latestPrice);
-          }
+      if (result.gold_price) {
+        const latestPrice = getLatestValue(result.gold_price);
+        if (latestPrice) {
+          setCurrentGoldPrice(latestPrice);
         }
+      }
 
-        if (result.data.exchange_rate) {
-          const exchangeRates = result.data.exchange_rate;
-          const dates = Object.keys(exchangeRates).sort().reverse();
-          if (dates.length > 0) {
-            const latestRate = exchangeRates[dates[0]];
-            setCurrentExchangeRate(latestRate);
-          }
+      if (result.exchange_rate) {
+        const latestRate = getLatestValue(result.exchange_rate);
+        if (latestRate) {
+          setCurrentExchangeRate(latestRate);
         }
       }
     } catch (error) {

@@ -7,6 +7,12 @@ import type {
   CreateDebtRecordRequest 
 } from '@/types';
 import { GoldPurchaseForm, UsdPurchaseForm, DebtRecordForm, RmbDepositForm } from './forms';
+import { fetchMarketDataHistory } from '@/lib/api/market-data';
+import { createRmbDeposit } from '@/lib/api/rmb-deposits';
+import { createDebtRecord } from '@/lib/api/debt-records';
+import { createUsdPurchase } from '@/lib/api/usd-purchases';
+import { createGoldPurchase } from '@/lib/api/gold-purchases';
+import { getLatestValue } from '@/utils';
 
 interface AddAssetModalProps {
   isOpen: boolean;
@@ -42,26 +48,19 @@ const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose, onSave }
   useEffect(() => {
     const fetchMarketData = async () => {
       try {
-        const response = await fetch('/api/market-data/history?days=7');
-        const result = await response.json();
+        const result = await fetchMarketDataHistory({ days: 7 });
 
-        if (result.success && result.data) {
-          if (result.data.gold_price) {
-            const goldPrices = result.data.gold_price;
-            const dates = Object.keys(goldPrices).sort().reverse();
-            if (dates.length > 0) {
-              const latestPrice = goldPrices[dates[0]];
-              setCurrentGoldPrice(latestPrice);
-            }
+        if (result.gold_price) {
+          const latestPrice = getLatestValue(result.gold_price);
+          if (latestPrice) {
+            setCurrentGoldPrice(latestPrice);
           }
+        }
 
-          if (result.data.exchange_rate) {
-            const exchangeRates = result.data.exchange_rate;
-            const dates = Object.keys(exchangeRates).sort().reverse();
-            if (dates.length > 0) {
-              const latestRate = exchangeRates[dates[0]];
-              setCurrentExchangeRate(latestRate);
-            }
+        if (result.exchange_rate) {
+          const latestRate = getLatestValue(result.exchange_rate);
+          if (latestRate) {
+            setCurrentExchangeRate(latestRate);
           }
         }
       } catch (error) {
@@ -137,61 +136,13 @@ const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose, onSave }
 
     try {
       if (selectedType === 'rmb') {
-        const response = await fetch('/api/rmb-deposits', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-
-        const result = await response.json();
-
-        if (!result.success) {
-          setErrorMessage(result.message || '保存失败，请重试');
-          setIsSaving(false);
-          return;
-        }
+        await createRmbDeposit(data as CreateRmbDepositRequest);
       } else if (selectedType === 'debt') {
-        const response = await fetch('/api/debt-records', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-
-        const result = await response.json();
-
-        if (!result.success) {
-          setErrorMessage(result.message || '保存失败，请重试');
-          setIsSaving(false);
-          return;
-        }
+        await createDebtRecord(data as CreateDebtRecordRequest);
       } else if (selectedType === 'usd') {
-        const response = await fetch('/api/usd-purchases', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-
-        const result = await response.json();
-
-        if (!result.success) {
-          setErrorMessage(result.message || '保存失败，请重试');
-          setIsSaving(false);
-          return;
-        }
+        await createUsdPurchase(data as CreateUsdPurchaseRequest);
       } else if (selectedType === 'gold') {
-        const response = await fetch('/api/gold-purchases', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        });
-
-        const result = await response.json();
-
-        if (!result.success) {
-          setErrorMessage(result.message || '保存失败，请重试');
-          setIsSaving(false);
-          return;
-        }
+        await createGoldPurchase(data as CreateGoldPurchaseRequest);
       }
 
       // 保存成功后，通知父组件刷新数据，而不是直接创建资产对象
@@ -200,7 +151,9 @@ const AddAssetModal: React.FC<AddAssetModalProps> = ({ isOpen, onClose, onSave }
       onSave(); // 通知父组件重新获取资产组合数据
     } catch (error) {
       console.error('保存失败:', error);
-      setErrorMessage('网络错误，请重试');
+      // 这里的 error 可能是 Error 对象，message 已经在封装函数里处理过了
+      const msg = error instanceof Error ? error.message : '网络错误，请重试';
+      setErrorMessage(msg);
       setIsSaving(false);
     }
   };

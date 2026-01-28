@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { formatNumber } from '@/utils';
 import type { MarketDataHistoryResponse } from '@/lib/api-response';
+import { fetchMarketDataHistory } from '@/lib/api/market-data';
 
 type TimeRange = '30d' | '90d' | '1y';
 
@@ -40,33 +41,24 @@ const UsdExchangeRateChart: React.FC<UsdExchangeRateChartProps> = ({ className, 
       }
 
       try {
-        let url: string;
+        let days: number;
         if (timeRange === '30d') {
-          url = '/api/market-data/history?days=30';
+          days = 30;
         } else if (timeRange === '90d') {
-          url = '/api/market-data/history?days=90';
+          days = 90;
         } else {
-          url = '/api/market-data/history?days=365';
+          days = 365;
         }
 
-        const response = await fetch(url, {
-          signal: controller.signal
-        });
-
-        const result = await response.json();
+        const result = await fetchMarketDataHistory({ days }, controller.signal);
 
         if (!controller.signal.aborted) {
-          if (result.success) {
-            const data = parseMarketData(result.data, timeRange);
-            setChartData(data);
-          } else {
-            setError('获取数据失败');
-            setChartData([]);
-          }
+          const data = parseMarketData(result, timeRange);
+          setChartData(data);
         }
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') return;
-        setError('网络错误');
+        setError('获取数据失败');
         setChartData([]);
       } finally {
         if (!controller.signal.aborted) {

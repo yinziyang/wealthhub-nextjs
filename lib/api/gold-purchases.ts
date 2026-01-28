@@ -22,8 +22,8 @@ interface ApiResponse<T> {
   };
 }
 
-export async function getGoldPurchases(): Promise<GoldPurchaseRecord[]> {
-  const response = await fetch('/api/gold-purchases');
+export async function getGoldPurchases(signal?: AbortSignal): Promise<GoldPurchaseRecord[]> {
+  const response = await fetch('/api/gold-purchases', { signal });
   const result: ApiResponse<GoldPurchaseRecord[]> = await response.json();
 
   if (!result.success) {

@@ -16,6 +16,7 @@ import AuthGuard from '@/components/AuthGuard';
 import { Asset, PortfolioAllResponse } from '@/types';
 import { createAssetObject, getLatestValue } from '@/utils';
 import { fetchPortfolioAll } from '@/lib/api/portfolio';
+import { fetchMarketDataHistory } from '@/lib/api/market-data';
 import type { MarketDataHistoryResponse } from '@/lib/api-response';
 
 type CurrentTab = 'assets' | 'profile';
@@ -45,7 +46,6 @@ function Dashboard() {
   // 初始化为默认占位资产
   const [assets, setAssets] = useState<Asset[]>(createDefaultAssets());
   const [marketData, setMarketData] = useState<MarketDataHistoryResponse | null>(null);
-  const [isMarketDataLoading, setIsMarketDataLoading] = useState(false);
   const [portfolio, setPortfolio] = useState<PortfolioAllResponse | null>(null);
   const [isPortfolioLoading, setIsPortfolioLoading] = useState(true);
 
@@ -80,110 +80,73 @@ function Dashboard() {
   };
 
   useEffect(() => {
+    // 仅在资产列表视图且当前标签为 assets 时获取数据
+    if (currentTab !== 'assets' || assetView !== 'list') return;
+
+    let isCancelled = false;
     const controller = new AbortController();
 
-    const fetchPortfolioData = async () => {
-      // 开始加载前，重置为 loading 状态
+    const fetchDashboardData = async () => {
+      // 启动加载状态
       setIsPortfolioLoading(true);
-      
-      try {
-        const data = await fetchPortfolioAll(controller.signal);
-        if (!controller.signal.aborted) {
-          setPortfolio(data);
-        }
-      } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') return;
-        
-        console.error('获取资产组合数据失败:', error);
-        if (!controller.signal.aborted) {
-          setPortfolio({
-            'gold-purchases': {},
-            'debt-records': {},
-            'usd-purchases': {},
-            'rmb-deposits': {},
-          });
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsPortfolioLoading(false);
-        }
-      }
+
+      // 1. 获取资产组合数据 (控制骨架屏)
+      fetchPortfolioAll(controller.signal)
+        .then(data => {
+          if (!isCancelled) {
+            setPortfolio(data);
+            setIsPortfolioLoading(false); // 资产数据返回，骨架屏消失
+          }
+        })
+        .catch(error => {
+          if (!isCancelled && error.name !== 'AbortError') {
+            console.error('获取资产组合数据失败:', error);
+            // 失败也需要关闭 loading，显示空状态或错误提示
+            setPortfolio({
+              'gold-purchases': {},
+              'debt-records': {},
+              'usd-purchases': {},
+              'rmb-deposits': {},
+            });
+            setIsPortfolioLoading(false);
+          }
+        });
+
+      // 2. 并发获取市场数据 (不阻塞 UI，独立更新)
+      fetchMarketDataHistory({ days: 7 }, controller.signal)
+        .then(data => {
+          if (!isCancelled) {
+            setMarketData(data);
+          }
+        })
+        .catch(error => {
+          if (!isCancelled && error.name !== 'AbortError') {
+            console.error('获取市场数据失败:', error);
+            setMarketData({ gold_price: {}, exchange_rate: {} });
+          }
+        });
     };
 
-    // Debounce to fetch to avoid double-calling in Strict Mode
-    const timeoutId = setTimeout(() => {
-      fetchPortfolioData();
-    }, 50);
+    fetchDashboardData();
 
     return () => {
-      clearTimeout(timeoutId);
+      isCancelled = true;
       controller.abort();
     };
-  }, []);
+  }, [currentTab, assetView]); // 依赖 assetView 以确保从详情页返回时刷新
 
   useEffect(() => {
-    if (portfolio && marketData) {
-      const goldPrice = getLatestValue(marketData.gold_price) || 500;
-      const exchangeRate = getLatestValue(marketData.exchange_rate) || 7.2;
-
-      const calculatedAssets = calculateAssets(portfolio, goldPrice, exchangeRate);
-      setAssets(calculatedAssets);
-    } else if (portfolio && isPortfolioLoading === false) {
-      const goldPrice = 500;
-      const exchangeRate = 7.2;
+    if (portfolio) {
+      // 如果有市场数据，使用最新价格；否则使用默认值
+      // 注意：这里不需要等待 isPortfolioLoading 完成，只要 portfolio 有值就计算
+      // 这样可以实现：先显示旧价格/默认价格 -> 市场数据回来后自动跳变为新价格
+      const goldPrice = marketData ? (getLatestValue(marketData.gold_price) || 500) : 500;
+      const exchangeRate = marketData ? (getLatestValue(marketData.exchange_rate) || 7.2) : 7.2;
 
       const calculatedAssets = calculateAssets(portfolio, goldPrice, exchangeRate);
       setAssets(calculatedAssets);
     }
-  }, [portfolio, marketData, isPortfolioLoading]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const fetchMarketData = async () => {
-      if (currentTab !== 'assets') return;
-
-      setIsMarketDataLoading(true);
-      try {
-        const response = await fetch('/api/market-data/history?days=7', {
-          signal: controller.signal
-        });
-        const result = await response.json();
-        
-        if (!controller.signal.aborted) {
-          if (result.success) {
-            setMarketData(result.data);
-          } else {
-            setMarketData({
-              gold_price: {},
-              exchange_rate: {}
-            });
-          }
-        }
-      } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') return;
-        
-        setMarketData({
-          gold_price: {},
-          exchange_rate: {}
-        });
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsMarketDataLoading(false);
-        }
-      }
-    };
-
-    // Debounce to fetch to avoid double-calling in Strict Mode
-    const timeoutId = setTimeout(() => {
-      fetchMarketData();
-    }, 50);
-
-    return () => {
-      clearTimeout(timeoutId);
-      controller.abort();
-    };
-  }, [currentTab]);
+  }, [portfolio, marketData]);
 
   const handleAddAsset = async () => {
     // 重新获取资产组合数据，而不是在本地添加资产

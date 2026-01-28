@@ -17,8 +17,8 @@ interface ApiResponse<T> {
   };
 }
 
-export async function getUsdPurchases(): Promise<UsdPurchaseRecord[]> {
-  const response = await fetch('/api/usd-purchases');
+export async function getUsdPurchases(signal?: AbortSignal): Promise<UsdPurchaseRecord[]> {
+  const response = await fetch('/api/usd-purchases', { signal });
   const result: ApiResponse<UsdPurchaseRecord[]> = await response.json();
 
   if (!result.success) {

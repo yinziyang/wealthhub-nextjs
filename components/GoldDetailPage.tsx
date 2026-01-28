@@ -7,6 +7,8 @@ import type {
   MarketDataHistoryResponse,
   MarketDataHourlyHistoryResponse,
 } from "@/lib/api-response";
+import { fetchMarketDataHistory } from "@/lib/api/market-data";
+import { getGoldPurchases } from "@/lib/api/gold-purchases";
 import GoldPriceChart from "@/components/GoldPriceChart";
 import GoldPurchaseRecords from "@/components/GoldPurchaseRecords";
 
@@ -35,31 +37,26 @@ const GoldDetailPage: React.FC<GoldDetailPageProps> = ({
 
       try {
         // Parallel requests
-        const [res24h, res7d, resRecords] = await Promise.all([
-          fetch('/api/market-data/history?hours=24', { signal: controller.signal }),
-          fetch('/api/market-data/history?days=7', { signal: controller.signal }),
-          fetch('/api/gold-purchases', { signal: controller.signal }),
-        ]);
-
-        // Parse responses
-        const [json24h, json7d, jsonRecords] = await Promise.all([
-          res24h.json(),
-          res7d.json(),
-          resRecords.json(),
+        // Note: fetchMarketDataHistory is used for both requests because we're in the client
+        // and we want to reuse the typed wrapper.
+        // However, the wrapper currently returns MarketDataHistoryResponse (days) type primarily.
+        // We need to cast or handle the response types carefully if they differ significantly.
+        // The current implementation of fetchMarketDataHistory handles parameters correctly.
+        
+        const [res24h, res7d, records] = await Promise.all([
+          fetchMarketDataHistory({ hours: 24 }, controller.signal),
+          fetchMarketDataHistory({ days: 7 }, controller.signal),
+          getGoldPurchases(controller.signal),
         ]);
 
         if (isCancelled) return;
 
         // Update state
-        if (json24h.success) {
-          setData24h(json24h.data);
-        }
-        if (json7d.success) {
-          setData7d(json7d.data);
-        }
-        if (jsonRecords.success) {
-          setPurchaseRecords(jsonRecords.data);
-        }
+        // fetchMarketDataHistory returns the data directly or throws
+        setData24h(res24h as unknown as MarketDataHourlyHistoryResponse); // Type assertion might be needed if types aren't perfectly aligned
+        setData7d(res7d);
+        setPurchaseRecords(records);
+        
       } catch (err) {
         if (!isCancelled && err instanceof Error && err.name !== 'AbortError') {
           console.error('获取数据失败:', err);
@@ -103,11 +100,8 @@ const GoldDetailPage: React.FC<GoldDetailPageProps> = ({
   // Refresh records after update/delete
   const fetchRecords = useCallback(async () => {
     try {
-      const res = await fetch('/api/gold-purchases');
-      const json = await res.json();
-      if (json.success) {
-        setPurchaseRecords(json.data);
-      }
+      const records = await getGoldPurchases();
+      setPurchaseRecords(records);
     } catch (err) {
       console.error('刷新购买记录失败:', err);
     }
