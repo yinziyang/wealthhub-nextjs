@@ -56,11 +56,11 @@ const UsdDetailPage: React.FC<UsdDetailPageProps> = ({
 
   // Calculate current exchange rate and change
   const currentExchangeRate = useMemo(() => {
-    if (!data30d?.exchange_rate) return 7.24; // Default value
+    if (!data30d?.exchange_rate) return 0;
     const entries = Object.entries(data30d.exchange_rate);
-    if (entries.length === 0) return 7.24;
+    if (entries.length === 0) return 0;
     const sorted = entries.sort(([a], [b]) => parseInt(b) - parseInt(a));
-    return sorted[0][1] || 7.24;
+    return sorted[0][1] || 0;
   }, [data30d]);
 
   const todayChangePercent = useMemo(() => {
@@ -113,10 +113,10 @@ const UsdDetailPage: React.FC<UsdDetailPageProps> = ({
         <div className="px-5 pt-5 pb-4 bg-gradient-to-b from-emerald-50/30 dark:from-emerald-900/10 to-transparent">
           <div className="mb-3">
             <div className="text-emerald-600 dark:text-emerald-400 text-4xl font-extrabold tracking-tight mb-0.5">
-              {loading ? (
-                <span className="inline-block w-32 h-10 bg-emerald-200 dark:bg-emerald-800 rounded animate-pulse" />
-              ) : (
+              {currentExchangeRate > 0 ? (
                 formatNumber(currentExchangeRate, 4)
+              ) : (
+                <span className="inline-block w-32 h-10 bg-emerald-200 dark:bg-emerald-800 rounded animate-pulse" />
               )}
             </div>
             <div className="flex items-center justify-between">
