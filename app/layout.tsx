@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import AntdMobileProvider from "@/components/AntdMobileProvider";
+import UpdatePrompt from "@/components/UpdatePrompt";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -46,6 +47,7 @@ export default function RootLayout({
       <body className="antialiased" suppressHydrationWarning>
         <AntdMobileProvider>
           <AuthProvider>
+            <UpdatePrompt />
             {children}
           </AuthProvider>
         </AntdMobileProvider>
