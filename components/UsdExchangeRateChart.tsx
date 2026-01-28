@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { formatNumber } from '@/utils';
 import type { MarketDataHistoryResponse } from '@/lib/api-response';
 import { fetchMarketDataHistory } from '@/lib/api/market-data';
@@ -24,27 +24,53 @@ const UsdExchangeRateChart: React.FC<UsdExchangeRateChartProps> = ({ className, 
   const [selectedPoint, setSelectedPoint] = useState<(ChartDataPoint & { x: number; y: number }) | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const prevTimeRangeRef = useRef<TimeRange>('30d');
 
   useEffect(() => {
     const controller = new AbortController();
+    const prevTimeRange = prevTimeRangeRef.current;
+    prevTimeRangeRef.current = timeRange;
 
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
 
-      // 如果当前是 30d 视图且提供了初始数据，直接使用
-      if (timeRange === '30d' && initialData30d) {
-        const data = parseMarketData(initialData30d, '30d');
-        setChartData(data);
-        setIsLoading(false);
+      // 30 天视图完全依赖父组件传入的数据，不再自己请求 /api/market-data/history?days=30
+      if (timeRange === '30d') {
+        if (initialData30d) {
+          const data = parseMarketData(initialData30d, '30d');
+          setChartData(data);
+        }
+
+        // 只有当从 90d/1y 切回 30d 时，才刷新一次 30d 数据
+        const switchedBackTo30d = prevTimeRange !== '30d';
+        if (!switchedBackTo30d) {
+          setIsLoading(false);
+          return;
+        }
+
+        try {
+          const result = await fetchMarketDataHistory({ days: 30 }, controller.signal);
+          if (!controller.signal.aborted) {
+            const data = parseMarketData(result, '30d');
+            setChartData(data);
+          }
+        } catch (err) {
+          if (err instanceof Error && err.name === 'AbortError') return;
+          setError('获取数据失败');
+        } finally {
+          if (!controller.signal.aborted) {
+            setIsLoading(false);
+          }
+        }
+
         return;
       }
 
+      // 只有在 90 天 / 1 年视图下才发起新的请求
       try {
         let days: number;
-        if (timeRange === '30d') {
-          days = 30;
-        } else if (timeRange === '90d') {
+        if (timeRange === '90d') {
           days = 90;
         } else {
           days = 365;

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useRef, useState, useEffect, useMemo } from "react";
 import { formatNumber } from "@/utils";
 import type {
   MarketDataHistoryResponse,
@@ -29,29 +29,56 @@ const GoldPriceChart: React.FC<GoldPriceChartProps> = ({ className, initialData2
   >(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const prevTimeRangeRef = useRef<TimeRange>("24h");
 
   // 获取市场数据
   useEffect(() => {
     const controller = new AbortController();
+    const prevTimeRange = prevTimeRangeRef.current;
+    prevTimeRangeRef.current = timeRange;
 
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
 
-      // 如果当前是 24h 视图且提供了初始数据，直接使用
-      if (timeRange === "24h" && initialData24h) {
-        const data = parseMarketData(initialData24h, "24h");
-        setChartData(data);
-        setIsLoading(false);
-        // 重要：如果有 initialData24h，不要再发请求
+      // 24 小时视图：首屏优先使用父组件传入的数据，避免重复请求
+      if (timeRange === "24h") {
+        if (initialData24h) {
+          const data = parseMarketData(initialData24h, "24h");
+          setChartData(data);
+        }
+
+        // 只有从 30d / 1y 切回 24h 时才刷新一次 24h 数据
+        const switchedBackTo24h = prevTimeRange !== "24h";
+        if (!switchedBackTo24h) {
+          setIsLoading(false);
+          return;
+        }
+
+        try {
+          const result = await fetchMarketDataHistory({ hours: 24 }, controller.signal);
+          if (!controller.signal.aborted) {
+            const data = parseMarketData(
+              result as unknown as MarketDataHourlyHistoryResponse,
+              "24h",
+            );
+            setChartData(data);
+          }
+        } catch (err) {
+          if (err instanceof Error && err.name === "AbortError") return;
+          setError("获取数据失败");
+        } finally {
+          if (!controller.signal.aborted) {
+            setIsLoading(false);
+          }
+        }
+
         return;
       }
 
       try {
         let params: { days?: number; hours?: number } = {};
-        if (timeRange === "24h") {
-          params = { hours: 24 };
-        } else if (timeRange === "30d") {
+        if (timeRange === "30d") {
           params = { days: 30 };
         } else {
           params = { days: 365 };

@@ -1,0 +1,29 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFD700;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#B8860B;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0A192F;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#050C16;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="100" ry="100" fill="url(#bgGradient)"/>
+
+  <path d="M210 210 L280 140 L340 190 L440 80 M440 80 H380 M440 80 V140" 
+        fill="none" 
+        stroke="url(#goldGradient)" 
+        stroke-width="40" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"/>
+
+  <circle cx="150" cy="330" r="110" fill="url(#goldGradient)" stroke="#8B6508" stroke-width="4"/>
+  <circle cx="150" cy="330" r="90" fill="none" stroke="#8B6508" stroke-width="2" opacity="0.5"/>
+  
+  <text x="150" y="375" font-family="Arial, sans-serif" font-size="120" font-weight="bold" fill="#5C4033" text-anchor="middle">¥</text>
+
+  <rect x="300" y="240" width="60" height="200" rx="15" fill="url(#goldGradient)"/>
+  <rect x="390" y="170" width="60" height="270" rx="15" fill="url(#goldGradient)"/>
+</svg>

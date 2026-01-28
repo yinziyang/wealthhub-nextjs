@@ -132,17 +132,14 @@ function Dashboard() {
     setIsPortfolioLoading(true);
 
     try {
-      // 第一步：先调用 fetchMarketDataHistory
-      await fetchMarketDataHistory({ days: 7 })
-        .then(data => {
-          setMarketData(data);
-        })
-        .catch(error => {
-          console.error('获取市场数据失败:', error);
-          setMarketData({ gold_price: {}, exchange_rate: {} });
+      // 第一步：调用 API 从第三方获取最新数据并写入 Supabase
+      await fetch('/api/market-data/fetch', { method: 'POST' })
+        .then(res => res.json())
+        .catch((error: Error) => {
+          console.error('获取并保存最新市场数据失败:', error);
         });
 
-      // 第二步：调用结束后，同时调用 fetchPortfolioAll 和 fetchMarketDataHistory
+      // 第二步：获取资产组合数据和市场历史数据
       await Promise.allSettled([
         fetchPortfolioAll()
           .then(data => {
