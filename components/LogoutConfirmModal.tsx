@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
@@ -12,13 +13,19 @@ interface LogoutConfirmModalProps {
 export default function LogoutConfirmModal({ isOpen, onClose }: LogoutConfirmModalProps) {
   const { signOut } = useAuth();
   const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   if (!isOpen) return null;
 
   const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
     const result = await signOut();
     if (result.success) {
       router.push('/login');
+    } else {
+      // 登出失败时恢复按钮状态，方便用户重试
+      setIsLoggingOut(false);
     }
   };
 
@@ -32,6 +39,7 @@ export default function LogoutConfirmModal({ isOpen, onClose }: LogoutConfirmMod
         className="absolute inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto"
         onClick={(e) => {
           if (e.target !== e.currentTarget) return;
+          if (isLoggingOut) return;
           onClose();
         }}
       ></div>
@@ -60,15 +68,20 @@ export default function LogoutConfirmModal({ isOpen, onClose }: LogoutConfirmMod
         <div className="flex gap-3 pt-2">
           <button
             onClick={onClose}
-            className="flex-1 bg-slate-100 dark:bg-surface-dark text-slate-700 dark:text-slate-300 py-4 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-surface-darker transition-colors"
+            disabled={isLoggingOut}
+            className="flex-1 bg-slate-100 dark:bg-surface-dark text-slate-700 dark:text-slate-300 py-4 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-surface-darker transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
             取消
           </button>
           <button
             onClick={handleLogout}
-            className="flex-1 bg-red-600 text-white py-4 rounded-xl font-bold hover:bg-red-700 transition-colors"
+            disabled={isLoggingOut}
+            className="flex-1 bg-red-600 text-white py-4 rounded-xl font-bold hover:bg-red-700 transition-colors disabled:opacity-70 disabled:cursor-wait flex items-center justify-center gap-2"
           >
-            退出登录
+            {isLoggingOut && (
+              <span className="inline-block size-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            )}
+            {isLoggingOut ? '正在退出…' : '退出登录'}
           </button>
         </div>
       </div>
