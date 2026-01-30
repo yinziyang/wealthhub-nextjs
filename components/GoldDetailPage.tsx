@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Asset, GoldPurchaseRecord } from "@/types";
 import { formatNumber } from "@/utils";
 import type {
@@ -12,6 +12,7 @@ import { getGoldPurchases } from "@/lib/api/gold-purchases";
 import GoldPriceChart from "@/components/GoldPriceChart";
 import GoldPurchaseRecords from "@/components/GoldPurchaseRecords";
 import PWAPullToRefresh from "@/components/PWAPullToRefresh";
+import { EventSource } from 'eventsource';
 
 interface GoldDetailPageProps {
   asset: Asset;
@@ -27,6 +28,8 @@ const GoldDetailPage: React.FC<GoldDetailPageProps> = ({ asset }) => {
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [realTimePrice, setRealTimePrice] = useState<number | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   const fetchData = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -42,6 +45,9 @@ const GoldDetailPage: React.FC<GoldDetailPageProps> = ({ asset }) => {
       setData24h(res24h as unknown as MarketDataHourlyHistoryResponse);
       setData7d(res7d);
       setPurchaseRecords(records);
+      
+      // Start SSE connection after initial data loads successfully
+      startSSEConnection();
     } catch (err) {
       if (err instanceof Error && err.name !== "AbortError") {
         console.error("获取数据失败:", err);
@@ -53,24 +59,63 @@ const GoldDetailPage: React.FC<GoldDetailPageProps> = ({ asset }) => {
     }
   }, []);
 
+  const startSSEConnection = useCallback(() => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+
+    const url = 'https://81.futsseapi.eastmoney.com/sse/118_AU9999_mx?token=1101ffec61617c99be287c1bec30851f';
+    const eventSource = new EventSource(url);
+    eventSourceRef.current = eventSource;
+
+    eventSource.onopen = () => {
+      console.log('SSE连接已建立');
+    };
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.mx && data.mx.length > 0) {
+          const newPrice = data.mx[0].p;
+          console.log('收到实时金价:', newPrice);
+          setRealTimePrice(newPrice);
+        }
+      } catch (error) {
+        console.error('解析SSE数据失败:', error);
+        console.log('收到原始数据:', event.data);
+      }
+    };
+
+    eventSource.onerror = (error) => {
+      console.error('SSE连接错误:', error);
+      eventSource.close();
+    };
+  }, []);
+
   // Consolidated data fetching
   useEffect(() => {
     const controller = new AbortController();
-    fetchData(controller.signal).catch(() => {}); // Catch to prevent unhandled rejection in useEffect
+    fetchData(controller.signal).catch(() => {});
 
     return () => {
       controller.abort();
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
     };
   }, [fetchData]);
 
   // Calculate current price and change
   const currentPrice = useMemo(() => {
+    if (realTimePrice !== null) {
+      return realTimePrice;
+    }
     if (!data24h?.gold_price) return 0;
     const entries = Object.entries(data24h.gold_price);
     if (entries.length === 0) return 0;
     const sorted = entries.sort(([a], [b]) => b.localeCompare(a));
     return sorted[0][1] || 0;
-  }, [data24h]);
+  }, [data24h, realTimePrice]);
 
   const todayChangePercent = useMemo(() => {
     if (!data7d?.gold_price) return 0;
